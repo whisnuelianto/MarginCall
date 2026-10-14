@@ -5,7 +5,7 @@
 (() => {
 "use strict";
 
-const VERSION = "2.5.0";
+const VERSION = "2.5.1";
 const KEY = "riskdesk.v2", OLD_KEY = "riskdesk.v1", AUTH_KEY = "riskdesk.auth";
 
 /* ================================================================
@@ -116,6 +116,7 @@ function normalize(d) {
     });
   }
   return {
+    ...d, // simpan kunci yang tidak dikenal agar versi lain tidak kehilangan data
     settings: st,
     rates: { ...b.rates, ...(d.rates || {}) },
     symbols: syms,
@@ -141,11 +142,25 @@ function load() {
   return s;
 }
 let S = load();
+/** Bandingkan versi "a.b.c". Hasil > 0 jika a lebih baru dari b. */
+function cmpVer(a, b) { const x = String(a || "0").split(".").map(Number), y = String(b || "0").split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; }
+// Jika data di browser ditulis oleh versi aplikasi yang lebih baru, versi ini tidak boleh menulis (agar data tidak rusak)
+let readOnly = cmpVer(S.appVersion, VERSION) > 0;
 function save(opts = {}) {
+  if (readOnly) { showStaleBanner(); return; }
   S.updatedAt = Date.now();
+  S.appVersion = VERSION;
   if (!lsSet(KEY, JSON.stringify(S))) toast("Gagal menyimpan", "Penyimpanan browser penuh atau diblokir.", "danger");
   resolveCache.clear();
   if (!opts.noSync) Cloud.schedule();
+}
+function showStaleBanner() {
+  if (document.getElementById("staleBanner")) return;
+  const b = document.createElement("div");
+  b.id = "staleBanner"; b.className = "stale-banner";
+  b.innerHTML = `<span>Versi RiskDesk yang lebih baru sudah dipakai di tab/perangkat ini. Muat ulang agar data tetap aman.</span><button class="btn sm primary" type="button">Muat ulang</button>`;
+  b.querySelector("button").onclick = () => location.reload();
+  document.body.appendChild(b);
 }
 const exportData = () => JSON.parse(JSON.stringify(S));
 
@@ -497,9 +512,11 @@ function renderCombo(q = "") {
   comboIdx = -1;
 }
 function openCombo(open) { symList.classList.toggle("open", open); symInput.setAttribute("aria-expanded", open); }
-function pickSym(s) {
+function pickSym(s, persist = true) {
   const sym = resolveSym(s) || S.symbols[0];
-  curSym = sym.s; S.last.sym = sym.s; save({ noSync: true });
+  const changed = S.last.sym !== sym.s;
+  curSym = sym.s; S.last.sym = sym.s;
+  if (persist && changed) save({ noSync: true });
   symInput.value = sym.s; openCombo(false);
   ["entry", "sl", "tp", "pcTp1"].forEach(id => $(id).step = Math.pow(10, -sym.d));
   $("symInfo").textContent = `Contract ${fmt(sym.cs, 0)} · 1 pip = ${sym.pip} · kutipan ${sym.q} · spread ±${fmt(sym.spr, 1)} pip`;
@@ -2102,14 +2119,18 @@ $("resetAll").onclick = async () => {
   S = blank(); authed = false; save({ noSync: true });
   refreshAll(); go("dash"); openOnboarding();
 };
-function applyData(d, t) {
+function applyData(d, t, keepSb) {
+  if (cmpVer(d && d.appVersion, VERSION) > 0) { readOnly = true; showStaleBanner(); return false; }
   S = normalize(d);
   if (t) S.updatedAt = t;
-  lsSet(KEY, JSON.stringify(S)); resolveCache.clear();
+  if (keepSb && keepSb.url) S.settings.sb = keepSb;
+  if (!readOnly) lsSet(KEY, JSON.stringify(S));
+  resolveCache.clear();
   refreshAll();
+  return true;
 }
 function refreshAll() {
-  applyTheme(); applyMenu(); renderTagInputs(); pickSym(resolveSym(S.last.sym) ? resolveSym(S.last.sym).s : "XAUUSD");
+  applyTheme(); applyMenu(); renderTagInputs(); pickSym(resolveSym(S.last.sym) ? resolveSym(S.last.sym).s : "XAUUSD", false);
   lastLevel = null; onDataChange();
   if (curView === "settings") showSettings();
 }
@@ -2164,7 +2185,7 @@ const Cloud = {
     if (remote && rt > (S.updatedAt || 0) + 1000) {
       let use = true;
       if (interactive && S.updatedAt) use = await confirmBox("Data cloud ditemukan", `Data cloud terakhir diperbarui ${new Date(rt).toLocaleString("id-ID")}. Muat data cloud ke perangkat ini? Pilih Batal untuk menimpa cloud dengan data perangkat ini.`, "Muat data cloud", false);
-      if (use) { const keepSb = S.settings.sb; applyData(remote.data, rt); S.settings.sb = keepSb; lsSet(KEY, JSON.stringify(S)); toast("Data dimuat dari cloud", "Perangkat ini sekarang sama dengan cloud.", "ok"); }
+      if (use) { if (applyData(remote.data, rt, S.settings.sb) && interactive) toast("Data dimuat dari cloud", "Perangkat ini sekarang sama dengan cloud.", "ok"); }
       else await this.push();
     } else if (!remote || (S.updatedAt || 0) > rt + 1000) await this.push();
     this.status = "ok"; this.lastSync = Date.now(); this.chip();
@@ -2175,14 +2196,14 @@ const Cloud = {
   async push() {
     if (!this.sess) return;
     this.status = "syncing"; this.chip();
-    // Cegah perangkat dengan data lama menimpa perubahan dari perangkat lain
+    if (readOnly) { this.status = "ok"; this.chip(); return; }
+    // Jangan pernah menimpa data cloud yang lebih baru dengan data lama
     const rows = await this.req(`/rest/v1/riskdesk_data?select=data,updated_at&user_id=eq.${this.sess.user.id}`);
     const remote = rows && rows[0], rt = remote ? new Date(remote.updated_at).getTime() : 0;
-    if (remote && this.base && rt > this.base + 1000) {
-      const keepSb = S.settings.sb;
-      applyData(remote.data, rt); S.settings.sb = keepSb; lsSet(KEY, JSON.stringify(S));
+    if (remote && rt > (S.updatedAt || 0) + 500) {
+      applyData(remote.data, rt, S.settings.sb);
       this.base = rt; this.status = "ok"; this.lastSync = Date.now(); this.chip(); this.render();
-      toast("Data diperbarui dari perangkat lain", "Perubahan terakhir di perangkat ini belum tersimpan. Ulangi jika perlu.", "warn");
+      toast("Data diperbarui dari perangkat lain", "Ada perubahan yang lebih baru di perangkat lain. Ulangi perubahan terakhir jika belum tersimpan.", "warn");
       return;
     }
     await this.req("/rest/v1/riskdesk_data", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
@@ -2320,16 +2341,28 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferr
 $("installBtn").onclick = async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice.catch(() => {}); deferredInstall = null; $("installBtn").hidden = true; };
 window.addEventListener("appinstalled", () => { $("installBtn").hidden = true; toast("Terpasang", "RiskDesk sekarang ada di layar utama Anda.", "ok"); });
 if ("serviceWorker" in navigator && /^https:|^http:\/\/localhost/.test(location.href)) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e)));
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").then(r => r.update && r.update()).catch(e => console.warn("SW:", e)));
+  // Saat versi baru aktif, muat ulang sekali agar semua tab/jendela memakai versi terbaru
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (swReloaded) return; swReloaded = true; location.reload(); });
 }
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("onbModal").classList.contains("open") && S.settings.onboarded) $("onbModal").classList.remove("open");
 });
-window.addEventListener("storage", e => { if (e.key === KEY && e.newValue) { try { S = normalize(JSON.parse(e.newValue)); resolveCache.clear(); refreshAll(); } catch (err) {} } });
+// Sinkron antar tab di perangkat yang sama: hanya terima data yang lebih baru, tanpa menyimpan ulang
+window.addEventListener("storage", e => {
+  if (e.key !== KEY || !e.newValue) return;
+  let d; try { d = JSON.parse(e.newValue); } catch (err) { return; }
+  if (cmpVer(d.appVersion, VERSION) > 0) { readOnly = true; showStaleBanner(); return; }
+  if (!((+d.updatedAt || 0) > (S.updatedAt || 0))) return;
+  S = normalize(d); resolveCache.clear(); refreshAll();
+});
 
 // Saat aplikasi dibuka kembali (pindah tab / buka HP), ambil data terbaru dari cloud
+let lastVisPull = 0;
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && Cloud.sess && Cloud.cfg()) {
+  if (document.visibilityState === "visible" && Cloud.sess && Cloud.cfg() && Date.now() - lastVisPull > 20000) {
+    lastVisPull = Date.now();
     Cloud.afterLogin(false).catch(e => Cloud.fail(e));
   }
 });
@@ -2338,7 +2371,8 @@ document.addEventListener("visibilitychange", () => {
 $("verTxt").textContent = "v" + VERSION;
 $("nCcy").innerHTML = NEWS_CCY.map(c => `<option>${c}</option>`).join("");
 $("lot").value = S.settings.lotStep >= 0.01 ? S.settings.lotStep : 0.01;
-applyTheme(); applyMenu(); applyNavTips(); renderTagInputs(); pickSym(curSym);
+applyTheme(); applyMenu(); applyNavTips(); renderTagInputs(); pickSym(curSym, false);
+if (readOnly) showStaleBanner();
 onDataChange();
 tick(); setInterval(tick, 30000);
 setInterval(() => { renderNewsSoon(); update(); if (curView === "pos") renderLive(); }, 60000);

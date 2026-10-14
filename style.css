@@ -367,3 +367,5 @@ body[data-space="invest"] .trade-only{display:none}
 .hist div{display:grid;grid-template-columns:1fr auto 64px;gap:10px;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line)}
 .hist div:last-child{border-bottom:0}
 .hist div span:last-child{text-align:right}
+
+.stale-banner{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:130;display:flex;gap:12px;align-items:center;background:var(--warn);color:#1a1405;font-weight:600;font-size:14px;padding:10px 14px;border-radius:12px;box-shadow:var(--shadow);max-width:calc(100% - 24px)}
