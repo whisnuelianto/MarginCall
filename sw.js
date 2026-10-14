@@ -1,6 +1,6 @@
 /* RiskDesk service worker: aplikasi tetap terbuka saat offline.
  * Strategi network-first agar pembaruan di GitHub langsung terpakai. */
-const CACHE = "riskdesk-v2.4.0";
+const CACHE = "riskdesk-v2.5.0";
 const ASSETS = ["./", "./index.html", "./style.css", "./app.js", "./config.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

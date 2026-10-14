@@ -28,8 +28,8 @@
     RiskDesk <small id="verTxt">v2</small>
   </div>
   <div class="space-switch" role="group" aria-label="Pilih ruang">
-    <button type="button" data-space="trade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Trading</button>
-    <button type="button" data-space="invest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Investasi</button>
+    <button type="button" data-space="trade" data-tip="Ruang Trading: kalkulator risiko MT5, posisi, jurnal, analitik."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Trading</button>
+    <button type="button" data-space="invest" data-tip="Ruang Investasi: tabungan emas, saham, SBN, reksa dana, kripto."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Investasi</button>
   </div>
   <p class="nav-label" data-group="trade">Trading</p>
   <p class="nav-label" data-group="save">Investasi</p>
@@ -53,23 +53,25 @@
 <main class="main">
   <header class="topbar">
     <div class="space-switch top" role="group" aria-label="Pilih ruang">
-    <button type="button" data-space="trade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Trading</button>
-    <button type="button" data-space="invest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Investasi</button>
+    <button type="button" data-space="trade" data-tip="Ruang Trading: kalkulator risiko MT5, posisi, jurnal, analitik."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Trading</button>
+    <button type="button" data-space="invest" data-tip="Ruang Investasi: tabungan emas, saham, SBN, reksa dana, kripto."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Investasi</button>
   </div>
     <h1 id="viewTitle">Dashboard</h1>
     <div class="sessions trade-only" id="sessions" aria-label="Sesi pasar"></div>
     <span class="clock num trade-only" id="clock"></span>
-    <span class="chip" id="syncChip" title="Status sinkronisasi"><i></i>Lokal</span>
+    <span class="chip" id="syncChip" data-tip="Status sinkronisasi cloud. Lokal = data hanya di perangkat ini. Klik untuk mengatur akun cloud."><i></i>Lokal</span>
     <button class="btn sm" id="installBtn" type="button" hidden>Install aplikasi</button>
-    <button class="icon-btn" id="themeBtn" type="button" aria-label="Ganti tema terang/gelap"></button>
+    <button class="icon-btn" id="helpBtn" type="button" aria-label="Cara pakai halaman ini" data-tip="Tampilkan cara pakai halaman ini">?</button>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="Ganti tema terang/gelap" data-tip="Ganti tema terang / gelap"></button>
   </header>
 
   <!-- ================= DASHBOARD ================= -->
   <section class="view on" id="v-dash">
+    <div class="help-slot" data-help="dash"></div>
     <div class="card">
       <div class="budget-head">
         <div>
-          <p class="lbl" style="margin:0">Total risiko semua SL terhadap modal</p>
+          <p class="lbl" style="margin:0">Total risiko semua SL terhadap modal <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Jumlah kerugian jika SL semua posisi (termasuk pending) kena, dibanding modal. Garis merah = batas Anda, bawaan 25%.">?</span></p>
           <div class="big num" id="riskPct">0%</div>
         </div>
         <div class="bstats">
@@ -107,7 +109,7 @@
         </div>
 
         <div class="field">
-          <label>Arah posisi</label>
+          <label>Arah posisi <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Buy jika memperkirakan harga naik, Sell jika memperkirakan harga turun.">?</span></label>
           <div class="dir">
             <button class="buy on" id="dirBuy" type="button">Buy</button>
             <button class="sell" id="dirSell" type="button">Sell</button>
@@ -115,7 +117,7 @@
         </div>
 
         <div class="field">
-          <label>Jenis order</label>
+          <label>Jenis order <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Market: langsung dieksekusi. Limit/Stop: pending order yang menunggu harga tertentu. Pending tetap dihitung di meter risiko.">?</span></label>
           <div class="seg3" role="group" aria-label="Jenis order">
             <button type="button" data-ot="market" class="on">Market</button>
             <button type="button" data-ot="limit">Limit</button>
@@ -125,7 +127,7 @@
         </div>
 
         <div class="field">
-          <label for="lot">Lot</label>
+          <label for="lot">Lot <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Ukuran posisi. 0.01 = micro lot. Gunakan bagian Hitung lot dari risiko di bawah untuk lot yang pas.">?</span></label>
           <div class="lotrow">
             <button class="step" type="button" data-lot="-1" aria-label="Kurangi lot">−</button>
             <input type="number" id="lot" class="num" step="0.01" min="0.01" value="0.01">
@@ -135,15 +137,15 @@
 
         <div class="row3 keep">
           <div class="field"><label for="entry">Harga entry</label><input type="number" id="entry" class="num" step="any" inputmode="decimal"></div>
-          <div class="field"><label for="sl">Stop loss</label><input type="number" id="sl" class="num" step="any" inputmode="decimal"></div>
-          <div class="field"><label for="tp">Take profit</label><input type="number" id="tp" class="num" step="any" inputmode="decimal"></div>
+          <div class="field"><label for="sl">Stop loss <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Harga penutupan otomatis saat rugi. Wajib diisi agar risiko bisa dihitung.">?</span></label><input type="number" id="sl" class="num" step="any" inputmode="decimal"></div>
+          <div class="field"><label for="tp">Take profit <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Harga penutupan otomatis saat target untung tercapai.">?</span></label><input type="number" id="tp" class="num" step="any" inputmode="decimal"></div>
         </div>
         <p class="hint err" id="calcErr"></p>
 
         <div class="row3 keep">
-          <div class="field"><label for="slPips">SL (pip)</label><input type="number" id="slPips" class="num" step="any" placeholder="mis. 20"></div>
+          <div class="field"><label for="slPips">SL (pip) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Isi jarak SL dalam pip, harga SL dihitung otomatis dari entry.">?</span></label><input type="number" id="slPips" class="num" step="any" placeholder="mis. 20"></div>
           <div class="field"><label for="tpPips">TP (pip)</label><input type="number" id="tpPips" class="num" step="any" placeholder="mis. 40"></div>
-          <div class="field"><label for="nights">Swap (malam)</label><input type="number" id="nights" class="num" step="1" min="0" value="0"></div>
+          <div class="field"><label for="nights">Swap (malam) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Berapa malam posisi akan ditahan. Dipakai untuk menghitung biaya swap.">?</span></label><input type="number" id="nights" class="num" step="1" min="0" value="0"></div>
         </div>
 
         <div class="row">
@@ -156,7 +158,7 @@
         </div>
 
         <hr class="sep">
-        <h2>Hitung lot dari risiko</h2>
+        <h2>Hitung lot dari risiko <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Tentukan berapa yang siap Anda rugikan (dalam % modal atau rupiah/dolar). Lot dihitung dari jarak SL.">?</span></h2>
         <p class="sub">Tentukan berapa yang siap Anda rugikan. Lot dihitung dari jarak SL di atas, termasuk biaya.</p>
         <div class="row">
           <div class="field"><label for="riskMode">Satuan risiko</label>
@@ -185,9 +187,9 @@
         <dl class="kv">
           <dt>Jarak SL / TP</dt><dd class="num" id="tDist">—</dd>
           <dt>Nilai per pip</dt><dd class="num" id="tPipVal">—</dd>
-          <dt>Biaya (spread + komisi − swap)</dt><dd class="num" id="tCost">—</dd>
+          <dt>Biaya <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Spread + komisi − swap. Diatur di Pengaturan → Biaya trading dan Simbol.">?</span></dt><dd class="num" id="tCost">—</dd>
           <dt>Margin dibutuhkan</dt><dd class="num" id="tMargin">—</dd>
-          <dt>Win rate impas</dt><dd class="num" id="tBE">—</dd>
+          <dt>Win rate impas <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Persentase menang minimal agar setup dengan R:R ini tidak rugi dalam jangka panjang.">?</span></dt><dd class="num" id="tBE">—</dd>
           <dt>Total risiko setelah entry</dt><dd class="num" id="tAfter">—</dd>
           <dt>Sisa jatah rugi hari ini</dt><dd class="num" id="tDayLeft">—</dd>
         </dl>
@@ -211,6 +213,7 @@
 
   <!-- ================= POSISI ================= -->
   <section class="view" id="v-pos">
+    <div class="help-slot" data-help="pos"></div>
     <div class="stack">
       <section class="card">
         <div class="card-head">
@@ -243,6 +246,7 @@
 
   <!-- ================= JURNAL ================= -->
   <section class="view" id="v-journal">
+    <div class="help-slot" data-help="journal"></div>
     <section class="card">
       <div class="card-head">
         <div><h2>Jurnal trade</h2><p class="sub" id="jCount">Posisi yang ditutup tercatat di sini.</p></div>
@@ -269,6 +273,7 @@
 
   <!-- ================= ANALITIK ================= -->
   <section class="view" id="v-stats">
+    <div class="help-slot" data-help="stats"></div>
     <section class="card">
       <div class="card-head">
         <div><h2>Ringkasan performa</h2><p class="sub">Dihitung dari jurnal trade.</p></div>
@@ -289,6 +294,7 @@
 
   <!-- ================= ALAT ================= -->
   <section class="view" id="v-tools">
+    <div class="help-slot" data-help="tools"></div>
     <div class="grid2 even" style="margin-top:0">
       <section class="card">
         <h2>Partial close &amp; break-even</h2>
@@ -333,6 +339,7 @@
 
   <!-- ================= BERITA ================= -->
   <section class="view" id="v-news">
+    <div class="help-slot" data-help="news"></div>
     <div class="grid2" style="margin-top:0">
       <section class="card">
         <div class="card-head"><div><h2>Jadwal berita</h2><p class="sub">Waktu ditampilkan dalam zona waktu perangkat Anda.</p></div></div>
@@ -368,10 +375,11 @@
     </div>
 
     <div class="subpane on" id="sv-sum">
+      <div class="help-slot" data-help="sv-sum"></div>
       <section class="card">
         <div class="card-head">
           <div><h2>Ringkasan tabungan</h2><p class="sub">Semua nilai dalam rupiah. Perbarui harga aset secara berkala agar nilainya akurat.</p></div>
-          <div class="actions"><button class="btn" data-svadd="asset" type="button">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button">Catat transaksi</button></div>
+          <div class="actions"><button class="btn" data-svadd="asset" type="button" data-tip="Daftarkan tabungan baru, mis. Emas Antam, BBCA, ORI025, Bitcoin. Setelah itu langsung catat pembeliannya.">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button" data-tip="Catat beli, jual, dividen/kupon, atau biaya. Tips: isi Total (Rp) dan harga, jumlah dihitung otomatis.">Catat transaksi</button></div>
         </div>
         <div class="kpis" id="svKpis"></div>
         <h3 style="margin:20px 0 8px">Alokasi aset</h3>
@@ -388,17 +396,19 @@
     </div>
 
     <div class="subpane" id="sv-assets">
+      <div class="help-slot" data-help="sv-assets"></div>
       <section class="card">
         <div class="card-head"><div><h2>Aset</h2><p class="sub">Dikelompokkan per jenis. Harga rata-rata dihitung otomatis dari transaksi.</p></div>
-          <div class="actions"><button class="btn" data-svadd="asset" type="button">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button">Catat transaksi</button></div></div>
+          <div class="actions"><button class="btn" id="svCgBtn" type="button" hidden data-tip="Ambil harga kripto terbaru (dalam rupiah) dari CoinGecko. Juga berjalan otomatis setiap 10 menit saat menu ini dibuka.">Perbarui harga kripto</button><button class="btn" data-svadd="asset" type="button" data-tip="Daftarkan tabungan baru, mis. Emas Antam, BBCA, ORI025, Bitcoin. Setelah itu langsung catat pembeliannya.">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button" data-tip="Catat beli, jual, dividen/kupon, atau biaya. Tips: isi Total (Rp) dan harga, jumlah dihitung otomatis.">Catat transaksi</button></div></div>
         <div id="svAssetList"></div>
       </section>
     </div>
 
     <div class="subpane" id="sv-tx">
+      <div class="help-slot" data-help="sv-tx"></div>
       <section class="card">
         <div class="card-head"><div><h2>Riwayat transaksi</h2><p class="sub">Beli, jual, dividen/kupon, dan biaya.</p></div>
-          <div class="actions"><button class="btn sm" id="svExport" type="button">Ekspor CSV</button><button class="btn sm primary" data-svadd="tx" type="button">Catat transaksi</button></div></div>
+          <div class="actions"><button class="btn sm" id="svExport" type="button" data-tip="Unduh semua transaksi untuk dibuka di Excel / Google Sheets.">Ekspor CSV</button><button class="btn sm primary" data-svadd="tx" type="button" data-tip="Catat beli, jual, dividen/kupon, atau biaya.">Catat transaksi</button></div></div>
         <div class="filters">
           <select id="svTxAsset" aria-label="Filter aset"><option value="">Semua aset</option></select>
           <select id="svTxKind" aria-label="Filter jenis"><option value="">Semua transaksi</option><option value="buy">Beli / setor</option><option value="sell">Jual / tarik</option><option value="income">Dividen / kupon / bunga</option><option value="fee">Biaya</option></select>
@@ -408,23 +418,26 @@
     </div>
 
     <div class="subpane" id="sv-goals">
+      <div class="help-slot" data-help="sv-goals"></div>
       <section class="card">
         <div class="card-head"><div><h2>Target menabung</h2><p class="sub">Hubungkan aset ke target lewat tombol Ubah di tab Aset. Nilai aset tersebut menjadi progres target.</p></div>
-          <button class="btn primary" data-svadd="goal" type="button">Tambah target</button></div>
+          <button class="btn primary" data-svadd="goal" type="button" data-tip="Buat tujuan menabung beserta nominal dan tenggatnya.">Tambah target</button></div>
         <div id="svGoals" class="goal-grid"></div>
       </section>
     </div>
 
     <div class="subpane" id="sv-plans">
+      <div class="help-slot" data-help="sv-plans"></div>
       <section class="card">
         <div class="card-head"><div><h2>Setoran rutin</h2><p class="sub" id="svPlanStreak"></p></div>
-          <button class="btn primary" data-svadd="plan" type="button">Tambah jadwal</button></div>
+          <button class="btn primary" data-svadd="plan" type="button" data-tip="Atur setoran bulanan, mis. emas Rp500.000 setiap tanggal 25.">Tambah jadwal</button></div>
         <p class="hint" style="margin-bottom:12px">Klik <b>Catat</b> setelah Anda benar-benar membeli. Jumlah dihitung otomatis dari nominal dan harga terakhir, dan bisa disesuaikan.</p>
         <div id="svPlans"></div>
       </section>
     </div>
 
     <div class="subpane" id="sv-proj">
+      <div class="help-slot" data-help="sv-proj"></div>
       <section class="card">
         <h2>Proyeksi tabungan</h2>
         <p class="sub">Perkiraan dengan imbal hasil tetap. Hasil nyata bisa lebih tinggi atau lebih rendah.</p>
@@ -436,7 +449,7 @@
         <div class="row3">
           <div class="field"><label for="pjYears">Lama (tahun)</label><input type="number" id="pjYears" class="num" step="1" value="10"></div>
           <div class="field"><label for="pjInf">Inflasi per tahun (%)</label><input type="number" id="pjInf" class="num" step="0.5" value="3"></div>
-          <div class="field"><label>&nbsp;</label><button class="btn" id="pjFromData" type="button">Pakai data tabungan</button></div>
+          <div class="field"><label>&nbsp;</label><button class="btn" id="pjFromData" type="button" data-tip="Isi otomatis dari total tabungan dan jadwal setoran rutin Anda.">Pakai data tabungan</button></div>
         </div>
         <svg class="curve" id="pjChart" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Grafik proyeksi"></svg>
         <p class="hint"><span style="color:var(--brass)">━</span> perkiraan nilai &nbsp; <span class="c-muted">━ total disetor</span></p>
@@ -445,10 +458,11 @@
     </div>
 
     <div class="subpane" id="sv-types">
+      <div class="help-slot" data-help="sv-types"></div>
       <section class="card">
         <div class="card-head"><div><h2>Jenis instrumen</h2><p class="sub">Tambah jenis apa pun (deposito, obligasi, P2P, properti, dll.). <b>Pengali</b>: jumlah unit harga per satuan, mis. saham 1 lot = 100 lembar.</p></div>
-          <div class="actions"><button class="btn sm" id="svAddType" type="button">Tambah jenis</button><button class="btn sm primary" id="svSaveTypes" type="button">Simpan</button></div></div>
-        <div class="tbl-wrap"><table class="symtbl"><thead><tr><th>Warna</th><th>Nama</th><th>Satuan</th><th>Cara hitung</th><th>Pengali</th><th>Label harga</th><th>Target %</th><th></th></tr></thead><tbody id="svTypeBody"></tbody></table></div>
+          <div class="actions"><button class="btn sm" id="svAddType" type="button" data-tip="Tambah instrumen lain: deposito, obligasi korporasi, P2P, properti, dll.">Tambah jenis</button><button class="btn sm primary" id="svSaveTypes" type="button">Simpan</button></div></div>
+        <div class="tbl-wrap"><table class="symtbl"><thead><tr><th>Warna</th><th>Nama</th><th>Satuan</th><th>Cara hitung <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Jumlah × harga: untuk instrumen dengan harga per unit (emas, saham, reksa dana, kripto). Nominal Rp: untuk yang dihitung dari nominal (SBN, deposito, tunai).">?</span></th><th>Pengali <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Jumlah unit harga dalam satu satuan. Contoh: saham dicatat per lot, harga per lembar, 1 lot = 100 lembar, maka pengali 100.">?</span></th><th>Label harga</th><th>Harga otomatis <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="CoinGecko mengambil harga kripto dalam rupiah secara otomatis. Jenis lain diisi manual.">?</span></th><th>Target % <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Porsi ideal jenis ini dari total tabungan. Total sebaiknya 100%.">?</span></th><th></th></tr></thead><tbody id="svTypeBody"></tbody></table></div>
         <p class="hint" id="svTypeHint" style="margin-top:10px"></p>
       </section>
       <section class="card" style="margin-top:20px">
@@ -461,6 +475,7 @@
 
   <!-- ================= PENGATURAN ================= -->
   <section class="view" id="v-settings">
+    <div class="help-slot" data-help="settings"></div>
     <section class="card">
       <div id="pinView" class="pin-box">
         <h2>Pengaturan terkunci</h2>
@@ -632,6 +647,7 @@
           <div class="actions">
             <button class="btn danger" id="resetAll" type="button">Reset semua data</button>
             <button class="btn ghost" id="lockSet" type="button">Kunci pengaturan</button>
+            <button class="btn ghost" id="helpReset" type="button">Tampilkan lagi semua panduan singkat</button>
           </div>
         </div>
       </div>

@@ -5,7 +5,7 @@
 (() => {
 "use strict";
 
-const VERSION = "2.4.0";
+const VERSION = "2.5.0";
 const KEY = "riskdesk.v2", OLD_KEY = "riskdesk.v1", AUTH_KEY = "riskdesk.auth";
 
 /* ================================================================
@@ -55,7 +55,7 @@ const DEFAULT_SAVE_TYPES = [
   { id:"saham", name:"Saham", unit:"lot", mult:100, mode:"unit", dec:0, color:"#5AA9E6", price:"Harga per lembar", target:0 },
   { id:"reksadana", name:"Reksa dana", unit:"unit", mult:1, mode:"unit", dec:4, color:"#2BC4A0", price:"NAB per unit", target:0 },
   { id:"sbn", name:"SBN (ORI, SBR, ST)", unit:"Rp nominal", mult:1, mode:"nominal", dec:0, color:"#B57BEA", price:"", target:0 },
-  { id:"kripto", name:"Kripto (spot)", unit:"koin", mult:1, mode:"unit", dec:8, color:"#F2A33A", price:"Harga per koin", target:0 },
+  { id:"kripto", name:"Kripto (spot)", unit:"koin", mult:1, mode:"unit", dec:8, color:"#F2A33A", price:"Harga per koin", target:0, auto:"coingecko" },
   { id:"tunai", name:"Tunai / dana darurat", unit:"Rp", mult:1, mode:"nominal", dec:0, color:"#8A9AB5", price:"", target:0 }
 ];
 
@@ -124,7 +124,9 @@ function normalize(d) {
     news: Array.isArray(d.news) ? d.news : [],
     savings: (() => {
       const sv = d.savings || {}, arr = k => Array.isArray(sv[k]) ? sv[k] : [];
-      return { types: arr("types").length ? arr("types") : b.savings.types, assets: arr("assets"), tx: arr("tx"), goals: arr("goals"), plans: arr("plans") };
+      const types = arr("types").length ? arr("types") : b.savings.types;
+      types.forEach(t => { if (t.id === "kripto" && t.auto === undefined) t.auto = "coingecko"; });
+      return { types, assets: arr("assets"), tx: arr("tx"), goals: arr("goals"), plans: arr("plans") };
     })(),
     last: d.last || b.last,
     updatedAt: +d.updatedAt || 0
@@ -385,6 +387,7 @@ function go(v) {
   if (v === "news") renderNews();
   if (v === "settings") showSettings();
   if (v === "save") renderSavings();
+  renderHelp();
   try { history.replaceState(null, "", "#" + v); } catch (e) {}
   window.scrollTo(0, 0);
 }
@@ -1295,6 +1298,50 @@ const todayStr = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.g
 const ymLabel = ym => { const [y, m] = ym.split("-"); return new Date(+y, +m - 1, 1).toLocaleDateString("id-ID", { month: "short", year: "2-digit" }); };
 const txSorted = () => [...SV().tx].sort((a, b) => (a.date + (a.t || "")).localeCompare(b.date + (b.t || "")));
 
+/* ---------- Riwayat harga ---------- */
+/** Simpan harga terbaru + riwayat (maks. satu titik per hari). */
+function recordPrice(a, p, t = Date.now()) {
+  if (!(p > 0)) return;
+  const day = new Date(t - new Date(t).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  a.prices = (a.prices || []).filter(x => x.d !== day);
+  a.prices.push({ d: day, p: +p });
+  a.prices.sort((x, y) => x.d.localeCompare(y.d));
+  if (a.prices.length > 1500) a.prices = a.prices.slice(-1500);
+  const last = a.prices[a.prices.length - 1];
+  if (last.d === day || !a.priceAt || t >= a.priceAt) { a.price = last.p; a.priceAt = Math.max(t, a.priceAt && last.d === day ? a.priceAt : 0); }
+}
+/** Titik harga gabungan (riwayat + harga transaksi) untuk grafik. */
+function pricePoints(a) {
+  const pts = (a.prices || []).map(x => ({ d: x.d, p: x.p }));
+  SV().tx.filter(x => x.asset === a.id && (x.kind === "buy" || x.kind === "sell") && +x.price > 0).forEach(x => pts.push({ d: x.date, p: +x.price, tx: true }));
+  return pts.sort((x, y) => x.d.localeCompare(y.d) || (x.tx ? -1 : 1));
+}
+
+/* ---------- Harga kripto otomatis (CoinGecko) ---------- */
+const CG_MAP = { BTC:"bitcoin", ETH:"ethereum", BNB:"binancecoin", SOL:"solana", XRP:"ripple", ADA:"cardano", DOGE:"dogecoin", USDT:"tether",
+  USDC:"usd-coin", LTC:"litecoin", TRX:"tron", DOT:"polkadot", AVAX:"avalanche-2", LINK:"chainlink", TON:"the-open-network", SHIB:"shiba-inu",
+  PEPE:"pepe", POL:"polygon-ecosystem-token", MATIC:"matic-network", ATOM:"cosmos", XLM:"stellar", NEAR:"near", APT:"aptos", SUI:"sui", ARB:"arbitrum", OP:"optimism", PAXG:"pax-gold", XAUT:"tether-gold" };
+let cgLast = 0, cgBusy = false;
+const autoAssets = () => SV().assets.filter(a => svType(a.type).auto === "coingecko" && (a.cg || CG_MAP[(a.code || "").toUpperCase()]));
+async function svAutoPrices(force) {
+  const list = autoAssets();
+  if (!list.length || cgBusy || (!force && Date.now() - cgLast < 10 * 60000)) return;
+  cgBusy = true;
+  const ids = [...new Set(list.map(a => a.cg || CG_MAP[a.code.toUpperCase()]))];
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?vs_currencies=idr&ids=" + encodeURIComponent(ids.join(",")));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json(); let n = 0;
+    list.forEach(a => { const id = a.cg || CG_MAP[a.code.toUpperCase()]; if (j[id] && j[id].idr > 0) { recordPrice(a, j[id].idr); a.priceSrc = "auto"; n++; } });
+    cgLast = Date.now();
+    if (n) { save(); if (curView === "save") renderSavings(); }
+    if (force) toast("Harga kripto diperbarui", `${n} aset diperbarui dari CoinGecko.`, n ? "ok" : "warn");
+  } catch (e) {
+    if (force) toast("Gagal mengambil harga kripto", "CoinGecko sedang tidak bisa diakses. Coba lagi nanti atau isi manual lewat tombol Harga.", "warn");
+  }
+  cgBusy = false;
+}
+
 /** Hitung posisi satu aset dari riwayat transaksinya. */
 function assetStats(a) {
   const t = svType(a.type), nominal = t.mode === "nominal", mult = nominal ? 1 : (t.mult || 1);
@@ -1339,6 +1386,8 @@ function renderSavings() {
     $("viewTitle").textContent = "Investasi · " + (SV_TITLES[svTab] || "");
   }
   $$(".subpane").forEach(p => p.classList.toggle("on", p.id === svTab));
+  renderHelp();
+  if (svTab === "sv-sum" || svTab === "sv-assets") svAutoPrices(false);
   const fn = { "sv-sum": svRenderSummary, "sv-assets": svRenderAssets, "sv-tx": svRenderTx, "sv-goals": svRenderGoals,
     "sv-plans": svRenderPlans, "sv-proj": svRenderProj, "sv-types": svRenderTypes }[svTab];
   if (fn) fn();
@@ -1346,13 +1395,15 @@ function renderSavings() {
 
 /* ---------- Ringkasan ---------- */
 function svRenderSummary() {
-  const P = portfolio(), k = (l, v, c = "") => `<div class="kpi"><span>${l}</span><b class="num ${c}">${v}</b></div>`;
+  const P = portfolio(), k = (l, v, c = "", tip = "") => `<div class="kpi"><span>${l}${tip ? " " + qi(tip) : ""}</span><b class="num ${c}">${v}</b></div>`;
   const ret = P.unreal + P.realized + P.income;
   $("svKpis").innerHTML = [
-    k("Total nilai tabungan", rp(P.value)), k("Modal bersih disetor", rp(P.netIn)),
-    k("Untung/rugi belum dijual", `${rpS(P.unreal)}${P.cost > 0 ? " · " + pct(P.unreal / P.cost * 100, 1) : ""}`, P.unreal >= 0 ? "c-buy" : "c-sell"),
-    k("Total imbal hasil", rpS(ret), ret >= 0 ? "c-buy" : "c-sell"),
-    k(`Dividen/kupon ${new Date().getFullYear()}`, rp(P.incomeYear), "c-buy"), k("Jumlah aset", SV().assets.length)
+    k("Total nilai tabungan", rp(P.value), "", "Jumlah nilai semua aset, dihitung dengan harga terakhir yang tercatat."),
+    k("Modal bersih disetor", rp(P.netIn), "", "Total uang yang Anda masukkan, dikurangi uang yang sudah ditarik/dijual."),
+    k("Untung/rugi belum dijual", `${rpS(P.unreal)}${P.cost > 0 ? " · " + pct(P.unreal / P.cost * 100, 1) : ""}`, P.unreal >= 0 ? "c-buy" : "c-sell", "Selisih nilai sekarang dengan modal aset yang masih Anda pegang. Belum menjadi uang nyata sampai dijual."),
+    k("Total imbal hasil", rpS(ret), ret >= 0 ? "c-buy" : "c-sell", "Untung/rugi belum dijual + untung/rugi dari penjualan + dividen/kupon/bunga."),
+    k(`Dividen/kupon ${new Date().getFullYear()}`, rp(P.incomeYear), "c-buy", "Pendapatan pasif tahun ini: dividen saham, kupon SBN, bunga."),
+    k("Jumlah aset", SV().assets.length, "", "Banyaknya aset yang Anda catat.")
   ].join("");
   // Alokasi
   const types = SV().types.filter(t => (P.byType[t.id] || 0) > 0);
@@ -1368,7 +1419,7 @@ function svRenderSummary() {
   const g = svGrowth();
   if (g.months.length >= 2) {
     lineChart("svCurve", [{ pts: g.contrib, color: getCss("--muted"), w: 1.5 }, { pts: g.value, color: getCss("--brass"), w: 2.5, fill: true }], {});
-    $("svCurveHint").innerHTML = `<span style="color:var(--brass)">━</span> nilai (perkiraan dari harga transaksi terakhir) &nbsp; <span class="c-muted">━ modal disetor</span> · ${ymLabel(g.months[0])} sampai ${ymLabel(g.months[g.months.length - 1])}`;
+    $("svCurveHint").innerHTML = `<span style="color:var(--brass)">━</span> nilai (dari riwayat harga yang tercatat) &nbsp; <span class="c-muted">━ modal disetor</span> · ${ymLabel(g.months[0])} sampai ${ymLabel(g.months[g.months.length - 1])}`;
   } else { lineChart("svCurve", [{ pts: [], color: "#888" }], { empty: "Grafik pertumbuhan muncul setelah ada transaksi di 2 bulan berbeda" }); $("svCurveHint").textContent = ""; }
   // Target & rutin mini
   $("svGoalsMini").innerHTML = SV().goals.length ? SV().goals.slice(0, 4).map(goalCard).join("") : `<p class="empty">Belum ada target. Buat di tab <b>Target</b>.</p>`;
@@ -1382,6 +1433,8 @@ function svGrowth() {
   const end = thisYm();
   while (true) { const ym = `${y}-${String(m).padStart(2, "0")}`; months.push(ym); if (ym >= end || months.length > 600) break; m++; if (m > 12) { m = 1; y++; } }
   const qty = {}, last = {}, contrib = [], value = []; let c = 0, i = 0;
+  const ptsBy = {}; SV().assets.forEach(a => ptsBy[a.id] = pricePoints(a));
+  const priceAt = (id, ym) => { const pts = ptsBy[id] || []; let p = NaN; for (const x of pts) { if (ymOf(x.d) <= ym) p = x.p; else break; } return p; };
   months.forEach((ym, mi) => {
     while (i < tx.length && ymOf(tx[i].date) <= ym) {
       const x = tx[i++], a = svAsset(x.asset); if (!a) continue;
@@ -1394,7 +1447,8 @@ function svGrowth() {
     Object.keys(qty).forEach(id => {
       const a = svAsset(id); if (!a) return;
       const t = svType(a.type), nom = t.mode === "nominal", mult = nom ? 1 : (t.mult || 1);
-      const p = nom ? 1 : (isNow && a.price > 0 ? +a.price : last[id]);
+      const ph = priceAt(id, ym);
+      const p = nom ? 1 : (isNow && a.price > 0 ? +a.price : (isFinite(ph) ? ph : last[id]));
       v += (qty[id] || 0) * mult * (p || 0);
     });
     contrib.push(c); value.push(v);
@@ -1418,18 +1472,20 @@ function svRenderAssets() {
         return `<tr><td><b>${esc(a.name)}</b>${a.code ? ` <span class="c-muted num">${esc(a.code)}</span>` : ""}</td>
           <td class="num">${st.nominal ? rp(st.qty) : qtyFmt(st.qty, t.dec) + " " + esc(t.unit)}</td>
           <td class="num">${st.nominal ? "—" : rp(st.avg)}</td>
-          <td class="num">${st.nominal ? "—" : rp(st.price)}${stale !== null && !st.nominal ? `<br><small class="c-muted">${stale ? stale + " hari lalu" : "hari ini"}</small>` : ""}</td>
+          <td class="num">${st.nominal ? "—" : rp(st.price)}${stale !== null && !st.nominal ? `<br><small class="${stale > 30 ? "c-warn" : "c-muted"}">${a.priceSrc === "auto" && svType(a.type).auto ? "otomatis · " : ""}${stale ? stale + " hari lalu" : "hari ini"}</small>` : ""}</td>
           <td class="num"><b>${rp(st.value)}</b></td>
           <td class="num ${st.unreal >= 0 ? "c-buy" : "c-sell"}">${st.nominal ? (st.income ? `<span class="c-buy">+${rp(st.income)} kupon/bunga</span>` : "—") : `${rpS(st.unreal)}<br><small>${pct(st.unrealPct, 1)}</small>`}</td>
           <td>${goal ? `<span class="pill neu">${esc(goal.name)}</span>` : '<span class="c-muted">—</span>'}</td>
-          <td><div class="actions">${st.nominal ? "" : `<button class="btn sm" data-sva="price" data-id="${a.id}">Harga</button>`}
-            <button class="btn sm primary" data-sva="tx" data-id="${a.id}">Transaksi</button>
-            <button class="btn sm ghost" data-sva="edit" data-id="${a.id}">Ubah</button>
-            <button class="btn sm ghost" data-sva="del" data-id="${a.id}" aria-label="Hapus aset">✕</button></div></td></tr>`;
+          <td><div class="actions">${st.nominal ? "" : `<button class="btn sm" data-sva="price" data-id="${a.id}" data-tip="Isi harga terbaru agar nilai dan untung/rugi akurat. Riwayat harga tersimpan untuk grafik.">Harga</button>`}
+            <button class="btn sm primary" data-sva="tx" data-id="${a.id}" data-tip="Catat beli, jual, dividen/kupon, atau biaya untuk aset ini.">Transaksi</button>
+            <button class="btn sm ghost" data-sva="edit" data-id="${a.id}" data-tip="Ganti nama/kode atau hubungkan aset ke target.">Ubah</button>
+            <button class="btn sm ghost" data-sva="del" data-id="${a.id}" aria-label="Hapus aset" data-tip="Hapus aset beserta semua transaksinya.">✕</button></div></td></tr>`;
       }).join("") + `</tbody></table></div>`;
   });
   $("svAssetList").innerHTML = html;
+  $("svCgBtn").hidden = !autoAssets().length;
 }
+$("svCgBtn").onclick = () => svAutoPrices(true);
 $("svAssetList").addEventListener("click", async e => {
   const b = e.target.closest("[data-sva]"); if (!b) return;
   const a = svAsset(b.dataset.id); if (!a) return;
@@ -1454,27 +1510,36 @@ async function svAssetForm(a, preset = {}) {
     <div class="row"><div class="field"><label>Nama aset</label><input name="name" type="text" value="${esc(v0.name)}" placeholder="mis. Emas Antam, Bank BCA"></div>
     <div class="field"><label>Kode (opsional)</label><input name="code" type="text" value="${esc(v0.code)}" placeholder="mis. BBCA, ORI025, BTC"></div></div>
     <div class="field" id="fPriceWrap"><label id="fPriceLbl">Harga sekarang (Rp)</label><input name="price" type="number" step="any" class="num" value="${v0.price || ""}" placeholder="boleh dikosongkan"></div>
-    <div class="field"><label>Untuk target</label><select name="goal">${goalOptions(v0.goal)}</select></div>` });
-  const sync = () => { const t = svType($("fType").value); $("fPriceWrap").hidden = t.mode === "nominal"; $("fPriceLbl").textContent = (t.price || "Harga per unit") + " sekarang (Rp)"; };
+    <div class="field" id="fCgWrap"><label>ID CoinGecko ${qi("Untuk harga otomatis. Terisi sendiri untuk koin populer (BTC, ETH, SOL, dll.). Untuk koin lain, salin ID dari alamat halaman koin di coingecko.com, mis. coingecko.com/en/coins/bitcoin → bitcoin.")}</label><input name="cg" id="fCg" type="text" value="${esc(v0.cg || "")}" placeholder="otomatis dari kode, mis. bitcoin" spellcheck="false"></div>
+    <div class="field"><label>Untuk target ${qi("Nilai aset ini akan dihitung sebagai progres target yang dipilih.")}</label><select name="goal">${goalOptions(v0.goal)}</select></div>` });
+  const sync = () => { const t = svType($("fType").value); $("fPriceWrap").hidden = t.mode === "nominal"; $("fPriceLbl").textContent = (t.price || "Harga per unit") + " sekarang (Rp)"; $("fCgWrap").hidden = t.auto !== "coingecko"; };
   $("fType").onchange = sync; sync();
   const v = await pr; if (!v) return null;
   if (!v.name.trim()) { toast("Nama aset belum diisi", "Contoh: Emas Antam, BBCA, Reksa dana pasar uang.", "danger"); return svAssetForm(a, v); }
   const price = num(v.price);
   const obj = a || { id: uid(), created: Date.now() };
-  Object.assign(obj, { type: v.type, name: v.name.trim(), code: v.code.trim().toUpperCase(), goal: v.goal });
-  if (price > 0 && price !== +obj.price) { obj.price = price; obj.priceAt = Date.now(); }
+  const code = v.code.trim().toUpperCase();
+  Object.assign(obj, { type: v.type, name: v.name.trim(), code, goal: v.goal, cg: (v.cg || "").trim().toLowerCase() || (svType(v.type).auto === "coingecko" ? (CG_MAP[code] || "") : "") });
+  if (price > 0 && price !== +obj.price) { recordPrice(obj, price); obj.priceSrc = "manual"; }
   if (!a) SV().assets.push(obj);
   save(); renderSavings();
+  if (svType(obj.type).auto === "coingecko" && obj.cg) { cgLast = 0; svAutoPrices(false); }
   if (!a) { toast("Aset ditambahkan", `${obj.name}. Lanjutkan dengan mencatat pembelian.`, "ok"); svTxForm({ asset: obj.id, kind: "buy" }); }
   return obj;
 }
 async function svUpdatePrice(a) {
-  const t = svType(a.type);
+  const t = svType(a.type), hist = (a.prices || []).slice(-6).reverse();
+  const histHtml = hist.length ? `<p class="lbl" style="margin:14px 0 6px">Riwayat harga terakhir</p><div class="hist">` + hist.map((x, i) => {
+    const prev = hist[i + 1], ch = prev ? (x.p - prev.p) / prev.p * 100 : NaN;
+    return `<div><span class="c-muted">${new Date(x.d).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</span><b class="num">${rp(x.p)}</b><span class="num ${ch >= 0 ? "c-buy" : "c-sell"}">${isFinite(ch) ? (ch >= 0 ? "+" : "") + fmt(ch, 1) + "%" : ""}</span></div>`;
+  }).join("") + `</div>` : "";
   const v = await ask({ title: `Harga ${a.name}`, ok: "Simpan harga", body: `<div class="field"><label>${esc(t.price || "Harga per unit")} sekarang (Rp)</label><input name="price" type="number" step="any" class="num" value="${a.price || ""}"></div>
-    <p class="hint">Cek harga di aplikasi tempat Anda membeli (mis. Pegadaian, aplikasi sekuritas, Bibit, Indodax).</p>` });
+    <div class="field"><label>Tanggal harga</label><input name="date" type="date" value="${todayStr()}"></div>
+    <p class="hint">Cek harga di aplikasi tempat Anda membeli (mis. Pegadaian, aplikasi sekuritas, Bibit, Indodax). Setiap pembaruan disimpan sebagai riwayat untuk grafik pertumbuhan.</p>${histHtml}` });
   if (!v) return; const p = num(v.price);
   if (!(p > 0)) { toast("Harga tidak valid", "Isi angka lebih dari 0.", "danger"); return; }
-  a.price = p; a.priceAt = Date.now(); save(); renderSavings();
+  const t0 = v.date ? new Date(v.date + "T12:00:00").getTime() : Date.now();
+  recordPrice(a, p, Math.min(t0, Date.now())); a.priceSrc = "manual"; save(); renderSavings();
 }
 
 /* ---------- Transaksi ---------- */
@@ -1520,7 +1585,8 @@ async function svTxForm(preset = {}, editTx) {
     tx.qty = num(v.qty); tx.price = num(v.price); tx.fee = num(v.fee) || 0;
     if (!(tx.qty > 0) || !(tx.price > 0)) { toast("Jumlah dan harga wajib diisi", "Isi jumlah dan harga, atau total dan harga.", "danger"); return svTxForm(v, editTx); }
     if (v.kind === "sell") { const st = assetStats(a); const avail = st.qty + (editTx && editTx.kind === "sell" ? +editTx.qty : 0); if (tx.qty > avail + 1e-9) { toast("Melebihi saldo", `Saldo ${a.name} hanya ${qtyFmt(avail, t.dec)} ${t.unit}.`, "danger"); return svTxForm(v, editTx); } }
-    if (!a.priceAt || new Date(tx.date).getTime() >= a.priceAt - 864e5) { a.price = tx.price; a.priceAt = Date.now(); }
+    const txT = Math.min(new Date(tx.date + "T12:00:00").getTime(), Date.now());
+    if (!a.priceAt || txT >= a.priceAt - 864e5) { recordPrice(a, tx.price, txT); a.priceSrc = "manual"; }
   } else {
     const amt = num(v.amount);
     if (!(amt > 0)) { toast("Nominal wajib diisi", "Isi nominal dalam rupiah.", "danger"); return svTxForm(v, editTx); }
@@ -1710,6 +1776,7 @@ function svRenderTypes() {
     <td><select data-k="mode" aria-label="Cara hitung"><option value="unit" ${t.mode === "unit" ? "selected" : ""}>Jumlah × harga</option><option value="nominal" ${t.mode === "nominal" ? "selected" : ""}>Nominal Rp</option></select></td>
     <td><input type="number" data-k="mult" value="${t.mult || 1}" step="any" class="num" aria-label="Pengali" ${t.mode === "nominal" ? "disabled" : ""}></td>
     <td><input type="text" data-k="price" value="${esc(t.price || "")}" aria-label="Label harga" ${t.mode === "nominal" ? "disabled" : ""}></td>
+    <td><select data-k="auto" aria-label="Harga otomatis" ${t.mode === "nominal" ? "disabled" : ""}><option value="" ${!t.auto ? "selected" : ""}>Manual</option><option value="coingecko" ${t.auto === "coingecko" ? "selected" : ""}>CoinGecko (kripto)</option></select></td>
     <td><input type="number" data-k="target" value="${t.target || 0}" step="1" class="num" aria-label="Target alokasi %"></td>
     <td><button class="btn sm ghost" data-svt="${i}" aria-label="Hapus jenis">✕</button></td></tr>`).join("");
   const tot = SV().types.reduce((s, t) => s + (+t.target || 0), 0);
@@ -1768,6 +1835,108 @@ function setSpace(sp, silent) {
 function firstView() { return curSpace() === "invest" ? "save" : "dash"; }
 document.addEventListener("click", e => { const b = e.target.closest(".space-switch [data-space]"); if (b) { if (b.dataset.space === "invest") svTab = svTab || "sv-sum"; setSpace(b.dataset.space); } });
 document.addEventListener("click", e => { const b = e.target.closest("[data-sv-go]"); if (b) { svTab = b.dataset.svGo; renderSavings(); } });
+
+/* ================================================================
+ * 17. BANTUAN KONTEKSTUAL: tooltip, ikon "?", dan kartu cara pakai
+ * ================================================================ */
+const NAV_TIPS = {
+  dash: "Rencanakan entry: isi pair, lot, entry, SL, TP. Lihat rugi/untung dan total risiko semua SL sebelum membuka posisi di MT5.",
+  pos: "Posisi & pending order: dari kalkulator (manual) dan otomatis dari MT5. Tutup posisi manual di sini agar tercatat di jurnal.",
+  journal: "Riwayat trade yang sudah ditutup. Tambahkan setup, emosi, dan pelajaran, atau import laporan History dari MT5.",
+  stats: "Evaluasi performa: win rate, profit factor, drawdown, serta pola per pair, sesi, hari, setup, dan emosi.",
+  tools: "Simulasi partial close & break-even, dan simulasi pertumbuhan modal.",
+  news: "Jadwal berita ekonomi. Entry yang terlalu dekat jadwal berita akan diberi peringatan.",
+  "sv-sum": "Gambaran semua tabungan: total nilai, untung/rugi, alokasi, pertumbuhan, target, dan setoran bulan ini.",
+  "sv-assets": "Daftar tabungan Anda. Mulai dari sini: Tambah aset, catat pembelian, dan perbarui harga.",
+  "sv-tx": "Semua beli, jual, dividen/kupon/bunga, dan biaya. Ubah atau hapus jika salah catat.",
+  "sv-goals": "Tujuan menabung (mis. Umroh 2028) dan berapa yang perlu disetor per bulan.",
+  "sv-plans": "Jadwal menabung bulanan. Klik Catat setelah membeli agar rekor konsistensi bertambah.",
+  "sv-proj": "Perkirakan nilai tabungan di masa depan dari setoran rutin dan asumsi imbal hasil.",
+  "sv-types": "Atur jenis instrumen (tambah deposito, obligasi, dll.), harga otomatis, dan target porsi tiap jenis.",
+  settings: "Akun, batas risiko, biaya, simbol, akun cloud, backup, dan PIN."
+};
+
+const HELP = {
+  dash: { t: "Cara pakai Dashboard", s: ["Pilih **pair**, **Buy/Sell**, dan jenis order.", "Isi **lot**, **entry**, **SL**, **TP**. Bisa juga isi SL/TP dalam pip, harganya dihitung otomatis.", "Baca tiket di kanan: rugi jika kena SL, untung jika kena TP, dan checklist aturan.", "Klik **Tambahkan ke posisi** agar ikut dijumlahkan di meter. Garis merah di meter = batas total risiko (bawaan 25% modal)."] },
+  pos: { t: "Cara pakai Posisi", s: ["Posisi manual: tutup dengan tombol **TP**, **SL**, atau **Harga lain** agar tercatat di Jurnal.", "Pending manual (Limit/Stop): klik **Terisi** saat tereksekusi, atau **Batal**.", "Bagian **Posisi live** terisi otomatis jika EA RiskDesk Bridge terpasang di MT5."] },
+  journal: { t: "Cara pakai Jurnal", s: ["Klik **Ubah** pada baris untuk menambah setup, emosi, dan pelajaran.", "**Import laporan MT5**: di MT5 buka History → klik kanan → Report → HTML, lalu pilih filenya.", "**Ekspor CSV** untuk dibuka di Excel atau Google Sheets."] },
+  stats: { t: "Cara pakai Analitik", s: ["Pilih periode di kanan atas.", "Baca **Temuan utama** untuk pola penting.", "Kumpulkan 20–30 trade agar pola mulai bermakna."] },
+  tools: { t: "Cara pakai Alat", s: ["**Partial close** memakai rencana entry di Dashboard. Atur target 1, persentase ditutup, dan ke mana SL digeser.", "**Simulasi** mengulang 1.000 urutan trade acak. Klik *Pakai statistik jurnal* untuk memakai angka Anda sendiri."] },
+  news: { t: "Cara pakai Berita", s: ["Klik **Ambil kalender minggu ini otomatis**, atau tambah manual dari ForexFactory.", "Saat merencanakan entry pada pair terkait dekat jadwal berita, checklist memberi peringatan merah."] },
+  "sv-sum": { t: "Cara pakai Ringkasan", s: ["Belum ada data? Klik **Tambah aset**, lalu catat pembelian pertama.", "Perbarui harga secara berkala di menu **Aset** agar nilai akurat. Harga kripto terbarui otomatis.", "Arahkan kursor (atau ketuk **?**) pada tiap angka untuk penjelasannya."] },
+  "sv-assets": { t: "Cara pakai Aset", s: ["**Tambah aset**: satu aset untuk tiap tabungan, mis. *Emas Antam*, *BBCA*, *ORI025*, *Bitcoin*.", "**Transaksi**: catat pembelian/penjualan aset tersebut.", "**Harga**: isi harga terbaru. Setiap pembaruan tersimpan sebagai riwayat dan dipakai di grafik.", "**Ubah**: ganti nama atau hubungkan aset ke target."] },
+  "sv-tx": { t: "Cara pakai Transaksi", s: ["Klik **Catat transaksi**, pilih aset dan jenis transaksi.", "Untuk pembelian, cukup isi **Total (Rp)** dan **Harga**. Jumlah gram/lot/unit dihitung otomatis.", "Dividen, kupon SBN, dan bunga dicatat sebagai **Dividen / kupon / bunga**."] },
+  "sv-goals": { t: "Cara pakai Target", s: ["Klik **Tambah target**: isi nama, nominal, dan tenggat.", "Buka **Aset → Ubah** dan pilih target untuk aset yang dialokasikan.", "Kartu target menghitung perkiraan setoran per bulan."] },
+  "sv-plans": { t: "Cara pakai Setoran rutin", s: ["Klik **Tambah jadwal**, mis. Emas Rp500.000 setiap tanggal 25.", "Setelah benar-benar membeli, klik **Catat**. Transaksi tercatat dan status menjadi *Sudah*.", "Lewat tanggal tapi belum dicatat? Statusnya *Terlewat*."] },
+  "sv-proj": { t: "Cara pakai Proyeksi", s: ["Isi saldo awal, setoran per bulan, imbal hasil, lama, dan inflasi.", "Klik **Pakai data tabungan** untuk mengisi otomatis dari data Anda.", "Hasilnya perkiraan, bukan jaminan."] },
+  "sv-types": { t: "Cara pakai Jenis & alokasi", s: ["**Tambah jenis** untuk instrumen lain (deposito, obligasi, P2P, properti).", "**Cara hitung**: *Nominal Rp* untuk yang dihitung dari nominal; *Jumlah × harga* untuk yang punya harga per unit.", "**Pengali**: unit harga per satuan, mis. 1 lot saham = 100 lembar.", "**Harga otomatis** CoinGecko untuk kripto. **Target %** untuk membandingkan porsi aktual dengan rencana."] },
+  settings: { t: "Cara pakai Pengaturan", s: ["Ubah modal, batas risiko, dan ruang yang tersedia di tab **Akun & risiko**.", "Daftar atau masuk akun cloud di tab **Cloud & MT5**.", "Unduh backup dan ganti PIN di tab **Data & keamanan**."] }
+};
+
+/* ---------- Tooltip mengambang ---------- */
+const tipBox = document.createElement("div");
+tipBox.className = "tipbox"; tipBox.setAttribute("role", "tooltip"); tipBox.hidden = true;
+document.body.appendChild(tipBox);
+let tipFor = null;
+function showTip(el) {
+  const txt = el.dataset.tip; if (!txt) return;
+  tipFor = el; tipBox.textContent = txt; tipBox.hidden = false;
+  const r = el.getBoundingClientRect(), bw = Math.min(300, window.innerWidth - 24);
+  tipBox.style.maxWidth = bw + "px";
+  const h = tipBox.offsetHeight, w = tipBox.offsetWidth;
+  let left = r.left + r.width / 2 - w / 2;
+  left = clamp(left, 12, window.innerWidth - w - 12);
+  let top = r.bottom + 8;
+  if (el.closest(".nav") && window.innerWidth > 900) { left = r.right + 10; top = r.top + r.height / 2 - h / 2; }
+  else if (top + h > window.innerHeight - 8) top = r.top - h - 8;
+  tipBox.style.left = left + "px"; tipBox.style.top = Math.max(8, top) + "px";
+}
+function hideTip() { tipBox.hidden = true; tipFor = null; }
+const canHover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
+document.addEventListener("mouseover", e => { if (!canHover) return; const el = e.target.closest("[data-tip]"); if (el && el !== tipFor) showTip(el); else if (!el && tipFor) hideTip(); });
+document.addEventListener("focusin", e => { const el = e.target.closest("[data-tip]"); if (el && canHover) showTip(el); });
+document.addEventListener("focusout", hideTip);
+document.addEventListener("scroll", hideTip, true);
+// Ikon "?" bisa diketuk (HP)
+document.addEventListener("click", e => {
+  const q = e.target.closest(".q");
+  if (q) { e.preventDefault(); e.stopPropagation(); tipFor === q && !tipBox.hidden ? hideTip() : showTip(q); return; }
+  if (!tipBox.hidden && !canHover) hideTip();
+}, true);
+const qi = tip => `<span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="${esc(tip)}">?</span>`;
+
+/* ---------- Kartu "cara pakai" per halaman ---------- */
+function helpKey() { return curView === "save" ? svTab : curView; }
+function renderHelp(force) {
+  const key = helpKey(), h = HELP[key];
+  $$(".help-slot").forEach(s => s.innerHTML = "");
+  if (!h) return;
+  const off = S.settings.helpOff || [];
+  if (off.includes(key) && !force) return;
+  const slot = $$(".help-slot").find(s => s.dataset.help === key);
+  if (!slot) return;
+  slot.innerHTML = `<div class="help-card"><div class="help-head"><b>💡 ${esc(h.t)}</b><button class="btn sm ghost" type="button" data-help-close="${key}">Mengerti, sembunyikan</button></div>
+    <ol>${h.s.map(x => `<li>${md(x)}</li>`).join("")}</ol></div>`;
+}
+// markdown mini untuk teks bantuan
+function md(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>"); }
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-help-close]"); if (!b) return;
+  S.settings.helpOff = [...new Set([...(S.settings.helpOff || []), b.dataset.helpClose])];
+  save({ noSync: true }); renderHelp();
+  toast("Panduan disembunyikan", "Klik tombol ? di kanan atas untuk menampilkannya lagi.");
+});
+$("helpBtn").onclick = () => {
+  const key = helpKey(), off = S.settings.helpOff || [];
+  if (off.includes(key)) { S.settings.helpOff = off.filter(k => k !== key); save({ noSync: true }); }
+  renderHelp(true);
+  const card = document.querySelector(".help-card"); if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "center" });
+};
+$("helpReset").onclick = () => { S.settings.helpOff = []; save({ noSync: true }); toast("Panduan singkat aktif lagi", "Kartu cara pakai akan tampil di setiap halaman.", "ok"); };
+
+function applyNavTips() {
+  $$(".nav-btn").forEach(b => { const k = b.dataset.sub || b.dataset.view; if (NAV_TIPS[k]) b.dataset.tip = NAV_TIPS[k]; });
+}
 
 /* ================================================================
  * 13. PENGATURAN
@@ -2169,7 +2338,7 @@ document.addEventListener("visibilitychange", () => {
 $("verTxt").textContent = "v" + VERSION;
 $("nCcy").innerHTML = NEWS_CCY.map(c => `<option>${c}</option>`).join("");
 $("lot").value = S.settings.lotStep >= 0.01 ? S.settings.lotStep : 0.01;
-applyTheme(); applyMenu(); renderTagInputs(); pickSym(curSym);
+applyTheme(); applyMenu(); applyNavTips(); renderTagInputs(); pickSym(curSym);
 onDataChange();
 tick(); setInterval(tick, 30000);
 setInterval(() => { renderNewsSoon(); update(); if (curView === "pos") renderLive(); }, 60000);
