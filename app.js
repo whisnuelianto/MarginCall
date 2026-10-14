@@ -5,7 +5,7 @@
 (() => {
 "use strict";
 
-const VERSION = "2.2.0";
+const VERSION = "2.4.0";
 const KEY = "riskdesk.v2", OLD_KEY = "riskdesk.v1", AUTH_KEY = "riskdesk.auth";
 
 /* ================================================================
@@ -42,11 +42,22 @@ const DEF_SET = {
   dailyLoss:5, weeklyLoss:10, newsWin:30,
   block:true, lossLock:true, corrWarn:true, newsWarn:true, autoBal:true, sound:true, notif:false,
   costs:true, comm:0,
-  theme:"dark", onboarded:false, pin:"",
+  theme:"dark", onboarded:false, pin:"", menu:"all", space:"trade",
   sb:{ url:"", key:"" }, liveInMeter:true, pendInMeter:true, followMt5Bal:false,
   setups:["Breakout","Pullback","Reversal","Range","Trend follow","News"],
   emotions:["Tenang","Yakin","Ragu","FOMO","Balas dendam","Bosan"]
 };
+
+// Jenis instrumen tabungan bawaan (bisa diubah/ditambah di menu Tabungan → Jenis & alokasi)
+// mode "unit": nilai = jumlah × pengali × harga; mode "nominal": nilai = nominal rupiah
+const DEFAULT_SAVE_TYPES = [
+  { id:"emas", name:"Emas", unit:"gram", mult:1, mode:"unit", dec:4, color:"#E0B04B", price:"Harga per gram", target:0 },
+  { id:"saham", name:"Saham", unit:"lot", mult:100, mode:"unit", dec:0, color:"#5AA9E6", price:"Harga per lembar", target:0 },
+  { id:"reksadana", name:"Reksa dana", unit:"unit", mult:1, mode:"unit", dec:4, color:"#2BC4A0", price:"NAB per unit", target:0 },
+  { id:"sbn", name:"SBN (ORI, SBR, ST)", unit:"Rp nominal", mult:1, mode:"nominal", dec:0, color:"#B57BEA", price:"", target:0 },
+  { id:"kripto", name:"Kripto (spot)", unit:"koin", mult:1, mode:"unit", dec:8, color:"#F2A33A", price:"Harga per koin", target:0 },
+  { id:"tunai", name:"Tunai / dana darurat", unit:"Rp", mult:1, mode:"nominal", dec:0, color:"#8A9AB5", price:"", target:0 }
+];
 
 // Kelompok aset yang bergerak mirip (dipakai untuk peringatan korelasi)
 const GROUPS = {
@@ -85,6 +96,7 @@ function blank() {
     rates: { ...DEFAULT_RATES },
     symbols: DEFAULT_SYMBOLS.map(x => ({ ...x })),
     positions: [], history: [], news: [],
+    savings: { types: DEFAULT_SAVE_TYPES.map(t => ({ ...t })), assets: [], tx: [], goals: [], plans: [] },
     last: { sym: "XAUUSD" }, updatedAt: 0
   };
 }
@@ -110,6 +122,10 @@ function normalize(d) {
     positions: Array.isArray(d.positions) ? d.positions : [],
     history: Array.isArray(d.history) ? d.history.map(h => h.id ? h : { ...h, id: "h" + Math.random().toString(36).slice(2, 10) }) : [],
     news: Array.isArray(d.news) ? d.news : [],
+    savings: (() => {
+      const sv = d.savings || {}, arr = k => Array.isArray(sv[k]) ? sv[k] : [];
+      return { types: arr("types").length ? arr("types") : b.savings.types, assets: arr("assets"), tx: arr("tx"), goals: arr("goals"), plans: arr("plans") };
+    })(),
     last: d.last || b.last,
     updatedAt: +d.updatedAt || 0
   };
@@ -351,12 +367,15 @@ function newsHits(sym) {
 /* ================================================================
  * 5. KERANGKA UI: navigasi, tema, toast, dialog
  * ================================================================ */
-const TITLES = { dash:"Dashboard", pos:"Posisi", journal:"Jurnal", stats:"Analitik", tools:"Alat bantu", news:"Kalender berita", settings:"Pengaturan" };
+const TITLES = { dash:"Dashboard", pos:"Posisi", journal:"Jurnal", stats:"Analitik", tools:"Alat bantu", news:"Kalender berita", save:"Investasi", settings:"Pengaturan" };
 let curView = "dash";
 function go(v) {
-  if (!TITLES[v]) v = "dash";
+  if (!TITLES[v]) v = firstView();
+  const m = S.settings.menu || "all", g = NAV_GROUP[v];
+  if ((m === "trade" && g === "save") || (m === "save" && g === "trade")) v = firstView();
   curView = v;
-  $$(".nav-btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  if (v !== "settings") setSpace(v === "save" ? "invest" : "trade", true);
+  $$(".nav-btn").forEach(b => b.classList.toggle("on", b.dataset.view === v && (!b.dataset.sub || b.dataset.sub === svTab)));
   $$(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
   $("viewTitle").textContent = TITLES[v];
   if (v === "pos") renderPositions();
@@ -365,10 +384,11 @@ function go(v) {
   if (v === "tools") { renderPartial(); if (!$("smBal").value) $("smBal").value = S.settings.balance; }
   if (v === "news") renderNews();
   if (v === "settings") showSettings();
+  if (v === "save") renderSavings();
   try { history.replaceState(null, "", "#" + v); } catch (e) {}
   window.scrollTo(0, 0);
 }
-$$(".nav-btn").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
+$$(".nav-btn").forEach(b => b.addEventListener("click", () => { if (b.dataset.sub) svTab = b.dataset.sub; go(b.dataset.view); }));
 document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) go(g.dataset.go); });
 
 const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -734,6 +754,7 @@ function onDataChange() {
   if (curView === "pos") renderPositions();
   if (curView === "journal") renderHistory();
   if (curView === "stats") renderStats();
+  if (curView === "save") renderSavings();
 }
 
 /* ================================================================
@@ -1258,6 +1279,497 @@ $("nFetch").onclick = async () => {
 };
 
 /* ================================================================
+ * 16. TABUNGAN INVESTASI (emas, saham, SBN, reksa dana, kripto, dll.)
+ *     Semua nilai dalam Rupiah. Metode harga rata-rata (average cost).
+ * ================================================================ */
+const KIND_LABEL = { buy: "Beli / setor", sell: "Jual / tarik", income: "Dividen / kupon / bunga", fee: "Biaya" };
+const SV = () => S.savings;
+const svType = id => SV().types.find(t => t.id === id) || { id, name: id, unit: "unit", mult: 1, mode: "unit", dec: 4, color: "#8A9AB5", price: "Harga per unit" };
+const svAsset = id => SV().assets.find(a => a.id === id);
+const rp = v => isFinite(v) ? (v < 0 ? "−" : "") + "Rp\u00a0" + Math.abs(Math.round(v)).toLocaleString("id-ID") : "—";
+const rpS = v => isFinite(v) ? (v > 0 ? "+" : "") + rp(v) : "—";
+const qtyFmt = (v, dec) => isFinite(v) ? v.toLocaleString("id-ID", { maximumFractionDigits: dec ?? 4 }) : "—";
+const ymOf = d => String(d).slice(0, 7);
+const thisYm = () => new Date().toISOString().slice(0, 7);
+const todayStr = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const ymLabel = ym => { const [y, m] = ym.split("-"); return new Date(+y, +m - 1, 1).toLocaleDateString("id-ID", { month: "short", year: "2-digit" }); };
+const txSorted = () => [...SV().tx].sort((a, b) => (a.date + (a.t || "")).localeCompare(b.date + (b.t || "")));
+
+/** Hitung posisi satu aset dari riwayat transaksinya. */
+function assetStats(a) {
+  const t = svType(a.type), nominal = t.mode === "nominal", mult = nominal ? 1 : (t.mult || 1);
+  let qty = 0, cost = 0, realized = 0, income = 0, netIn = 0, lastPrice = NaN, first = null;
+  txSorted().filter(x => x.asset === a.id).forEach(x => {
+    const price = nominal ? 1 : +x.price, q = +x.qty || 0, fee = +x.fee || 0;
+    if (!first) first = x.date;
+    if (x.kind === "buy") { qty += q; cost += q * mult * price + fee; netIn += q * mult * price + fee; lastPrice = price; }
+    else if (x.kind === "sell") {
+      const avg = qty > 0 ? cost / qty : 0, proceeds = q * mult * price - fee;
+      realized += proceeds - avg * q; cost -= avg * q; qty -= q; netIn -= proceeds; lastPrice = price;
+      if (qty < 1e-12) { qty = 0; cost = 0; }
+    }
+    else if (x.kind === "income") income += +x.amount || 0;
+    else if (x.kind === "fee") realized -= +x.amount || 0;
+  });
+  const price = nominal ? 1 : (a.price > 0 ? +a.price : lastPrice);
+  const value = qty * mult * (isFinite(price) ? price : 0);
+  const unreal = value - cost;
+  return { t, qty, cost, avg: qty > 0 ? cost / (qty * mult) : NaN, price, value, unreal, unrealPct: cost > 0 ? unreal / cost * 100 : NaN,
+    realized, income, netIn, total: unreal + realized + income, first, mult, nominal };
+}
+function portfolio() {
+  const rows = SV().assets.map(a => ({ a, st: assetStats(a) }));
+  const sum = k => rows.reduce((s, r) => s + (r.st[k] || 0), 0);
+  const byType = {};
+  rows.forEach(r => { const k = r.a.type; byType[k] = (byType[k] || 0) + r.st.value; });
+  const yr = new Date().getFullYear() + "";
+  const incomeYear = SV().tx.filter(x => x.kind === "income" && x.date.startsWith(yr)).reduce((s, x) => s + (+x.amount || 0), 0);
+  return { rows, value: sum("value"), cost: sum("cost"), unreal: sum("unreal"), realized: sum("realized"), income: sum("income"), netIn: sum("netIn"), byType, incomeYear };
+}
+
+/* ---------- Navigasi sub-tab ---------- */
+let svTab = "sv-sum";
+$$("[data-sv]").forEach(b => b.onclick = () => { svTab = b.dataset.sv; renderSavings(); });
+
+const SV_TITLES = { "sv-sum": "Ringkasan", "sv-assets": "Aset", "sv-tx": "Transaksi", "sv-goals": "Target", "sv-plans": "Setoran rutin", "sv-proj": "Proyeksi", "sv-types": "Jenis & alokasi" };
+function renderSavings() {
+  $$("[data-sv]").forEach(b => b.classList.toggle("on", b.dataset.sv === svTab));
+  if (curView === "save") {
+    $$(".nav-btn").forEach(b => b.classList.toggle("on", b.dataset.view === "save" && b.dataset.sub === svTab));
+    $("viewTitle").textContent = "Investasi · " + (SV_TITLES[svTab] || "");
+  }
+  $$(".subpane").forEach(p => p.classList.toggle("on", p.id === svTab));
+  const fn = { "sv-sum": svRenderSummary, "sv-assets": svRenderAssets, "sv-tx": svRenderTx, "sv-goals": svRenderGoals,
+    "sv-plans": svRenderPlans, "sv-proj": svRenderProj, "sv-types": svRenderTypes }[svTab];
+  if (fn) fn();
+}
+
+/* ---------- Ringkasan ---------- */
+function svRenderSummary() {
+  const P = portfolio(), k = (l, v, c = "") => `<div class="kpi"><span>${l}</span><b class="num ${c}">${v}</b></div>`;
+  const ret = P.unreal + P.realized + P.income;
+  $("svKpis").innerHTML = [
+    k("Total nilai tabungan", rp(P.value)), k("Modal bersih disetor", rp(P.netIn)),
+    k("Untung/rugi belum dijual", `${rpS(P.unreal)}${P.cost > 0 ? " · " + pct(P.unreal / P.cost * 100, 1) : ""}`, P.unreal >= 0 ? "c-buy" : "c-sell"),
+    k("Total imbal hasil", rpS(ret), ret >= 0 ? "c-buy" : "c-sell"),
+    k(`Dividen/kupon ${new Date().getFullYear()}`, rp(P.incomeYear), "c-buy"), k("Jumlah aset", SV().assets.length)
+  ].join("");
+  // Alokasi
+  const types = SV().types.filter(t => (P.byType[t.id] || 0) > 0);
+  if (!P.value) { $("svAllocBar").innerHTML = ""; $("svAllocLegend").innerHTML = `<p class="empty">Belum ada aset. Mulai dengan <b>Tambah aset</b>, lalu <b>Catat transaksi</b> pembelian pertama.</p>`; }
+  else {
+    $("svAllocBar").innerHTML = types.map(t => `<i style="width:${P.byType[t.id] / P.value * 100}%;background:${t.color}" title="${esc(t.name)}"></i>`).join("");
+    $("svAllocLegend").innerHTML = types.map(t => {
+      const p = P.byType[t.id] / P.value * 100, tgt = +t.target || 0;
+      return `<div class="lg"><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b><span class="num">${pct(p, 1)}</span><span class="num c-muted">${rp(P.byType[t.id])}</span>${tgt ? `<span class="c-muted">target ${tgt}%</span>` : ""}</div>`;
+    }).join("");
+  }
+  // Pertumbuhan
+  const g = svGrowth();
+  if (g.months.length >= 2) {
+    lineChart("svCurve", [{ pts: g.contrib, color: getCss("--muted"), w: 1.5 }, { pts: g.value, color: getCss("--brass"), w: 2.5, fill: true }], {});
+    $("svCurveHint").innerHTML = `<span style="color:var(--brass)">━</span> nilai (perkiraan dari harga transaksi terakhir) &nbsp; <span class="c-muted">━ modal disetor</span> · ${ymLabel(g.months[0])} sampai ${ymLabel(g.months[g.months.length - 1])}`;
+  } else { lineChart("svCurve", [{ pts: [], color: "#888" }], { empty: "Grafik pertumbuhan muncul setelah ada transaksi di 2 bulan berbeda" }); $("svCurveHint").textContent = ""; }
+  // Target & rutin mini
+  $("svGoalsMini").innerHTML = SV().goals.length ? SV().goals.slice(0, 4).map(goalCard).join("") : `<p class="empty">Belum ada target. Buat di tab <b>Target</b>.</p>`;
+  const plans = SV().plans.filter(p => p.active);
+  $("svStreak").innerHTML = plans.length ? streakText() : "Belum ada jadwal setoran rutin.";
+  $("svPlansMini").innerHTML = plans.length ? plans.map(planRow).join("") : `<p class="empty">Atur jadwal di tab <b>Rutin</b>, misalnya beli emas setiap tanggal 25.</p>`;
+}
+function svGrowth() {
+  const tx = txSorted(); if (!tx.length) return { months: [], contrib: [], value: [] };
+  const months = []; let [y, m] = ymOf(tx[0].date).split("-").map(Number);
+  const end = thisYm();
+  while (true) { const ym = `${y}-${String(m).padStart(2, "0")}`; months.push(ym); if (ym >= end || months.length > 600) break; m++; if (m > 12) { m = 1; y++; } }
+  const qty = {}, last = {}, contrib = [], value = []; let c = 0, i = 0;
+  months.forEach((ym, mi) => {
+    while (i < tx.length && ymOf(tx[i].date) <= ym) {
+      const x = tx[i++], a = svAsset(x.asset); if (!a) continue;
+      const t = svType(a.type), nom = t.mode === "nominal", mult = nom ? 1 : (t.mult || 1), price = nom ? 1 : +x.price, q = +x.qty || 0, fee = +x.fee || 0;
+      if (x.kind === "buy") { qty[a.id] = (qty[a.id] || 0) + q; c += q * mult * price + fee; last[a.id] = price; }
+      if (x.kind === "sell") { qty[a.id] = (qty[a.id] || 0) - q; c -= q * mult * price - fee; last[a.id] = price; }
+    }
+    const isNow = mi === months.length - 1;
+    let v = 0;
+    Object.keys(qty).forEach(id => {
+      const a = svAsset(id); if (!a) return;
+      const t = svType(a.type), nom = t.mode === "nominal", mult = nom ? 1 : (t.mult || 1);
+      const p = nom ? 1 : (isNow && a.price > 0 ? +a.price : last[id]);
+      v += (qty[id] || 0) * mult * (p || 0);
+    });
+    contrib.push(c); value.push(v);
+  });
+  return { months, contrib, value };
+}
+
+/* ---------- Aset ---------- */
+function svRenderAssets() {
+  const P = portfolio();
+  if (!SV().assets.length) { $("svAssetList").innerHTML = `<p class="empty">Belum ada aset. Klik <b>Tambah aset</b>, misalnya "Emas Antam", "BBCA", atau "ORI025".</p>`; return; }
+  let html = "";
+  SV().types.forEach(t => {
+    const rows = P.rows.filter(r => r.a.type === t.id); if (!rows.length) return;
+    const tot = rows.reduce((s, r) => s + r.st.value, 0);
+    html += `<h3 class="type-h"><span class="dot" style="background:${t.color}"></span>${esc(t.name)} <span class="num c-muted">${rp(tot)}</span></h3>
+      <div class="tbl-wrap"><table><thead><tr><th>Aset</th><th>Jumlah</th><th>Harga rata-rata</th><th>Harga sekarang</th><th>Nilai</th><th>Untung/rugi</th><th>Target</th><th></th></tr></thead><tbody>` +
+      rows.map(({ a, st }) => {
+        const goal = SV().goals.find(g => g.id === a.goal);
+        const stale = a.priceAt ? Math.round((Date.now() - a.priceAt) / 864e5) : null;
+        return `<tr><td><b>${esc(a.name)}</b>${a.code ? ` <span class="c-muted num">${esc(a.code)}</span>` : ""}</td>
+          <td class="num">${st.nominal ? rp(st.qty) : qtyFmt(st.qty, t.dec) + " " + esc(t.unit)}</td>
+          <td class="num">${st.nominal ? "—" : rp(st.avg)}</td>
+          <td class="num">${st.nominal ? "—" : rp(st.price)}${stale !== null && !st.nominal ? `<br><small class="c-muted">${stale ? stale + " hari lalu" : "hari ini"}</small>` : ""}</td>
+          <td class="num"><b>${rp(st.value)}</b></td>
+          <td class="num ${st.unreal >= 0 ? "c-buy" : "c-sell"}">${st.nominal ? (st.income ? `<span class="c-buy">+${rp(st.income)} kupon/bunga</span>` : "—") : `${rpS(st.unreal)}<br><small>${pct(st.unrealPct, 1)}</small>`}</td>
+          <td>${goal ? `<span class="pill neu">${esc(goal.name)}</span>` : '<span class="c-muted">—</span>'}</td>
+          <td><div class="actions">${st.nominal ? "" : `<button class="btn sm" data-sva="price" data-id="${a.id}">Harga</button>`}
+            <button class="btn sm primary" data-sva="tx" data-id="${a.id}">Transaksi</button>
+            <button class="btn sm ghost" data-sva="edit" data-id="${a.id}">Ubah</button>
+            <button class="btn sm ghost" data-sva="del" data-id="${a.id}" aria-label="Hapus aset">✕</button></div></td></tr>`;
+      }).join("") + `</tbody></table></div>`;
+  });
+  $("svAssetList").innerHTML = html;
+}
+$("svAssetList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-sva]"); if (!b) return;
+  const a = svAsset(b.dataset.id); if (!a) return;
+  const act = b.dataset.sva;
+  if (act === "price") return svUpdatePrice(a);
+  if (act === "tx") return svTxForm({ asset: a.id });
+  if (act === "edit") return svAssetForm(a);
+  if (act === "del") {
+    const n = SV().tx.filter(x => x.asset === a.id).length;
+    if (!(await confirmBox(`Hapus ${a.name}?`, `Aset dan ${n} transaksinya akan dihapus permanen.`, "Hapus aset"))) return;
+    SV().assets = SV().assets.filter(x => x.id !== a.id); SV().tx = SV().tx.filter(x => x.asset !== a.id);
+    SV().plans = SV().plans.filter(p => p.asset !== a.id); save(); renderSavings();
+  }
+});
+const typeOptions = cur => SV().types.map(t => `<option value="${t.id}" ${t.id === cur ? "selected" : ""}>${esc(t.name)} (${esc(t.unit)})</option>`).join("");
+const goalOptions = cur => `<option value="">Tanpa target</option>` + SV().goals.map(g => `<option value="${g.id}" ${g.id === cur ? "selected" : ""}>${esc(g.name)}</option>`).join("");
+
+async function svAssetForm(a, preset = {}) {
+  const v0 = { type: "emas", name: "", code: "", price: "", goal: "", ...(a || {}), ...preset };
+  const pr = ask({ title: a ? `Ubah ${a.name}` : "Tambah aset", ok: a ? "Simpan" : "Tambah aset", body: `
+    <div class="field"><label>Jenis</label><select name="type" id="fType">${typeOptions(v0.type)}</select></div>
+    <div class="row"><div class="field"><label>Nama aset</label><input name="name" type="text" value="${esc(v0.name)}" placeholder="mis. Emas Antam, Bank BCA"></div>
+    <div class="field"><label>Kode (opsional)</label><input name="code" type="text" value="${esc(v0.code)}" placeholder="mis. BBCA, ORI025, BTC"></div></div>
+    <div class="field" id="fPriceWrap"><label id="fPriceLbl">Harga sekarang (Rp)</label><input name="price" type="number" step="any" class="num" value="${v0.price || ""}" placeholder="boleh dikosongkan"></div>
+    <div class="field"><label>Untuk target</label><select name="goal">${goalOptions(v0.goal)}</select></div>` });
+  const sync = () => { const t = svType($("fType").value); $("fPriceWrap").hidden = t.mode === "nominal"; $("fPriceLbl").textContent = (t.price || "Harga per unit") + " sekarang (Rp)"; };
+  $("fType").onchange = sync; sync();
+  const v = await pr; if (!v) return null;
+  if (!v.name.trim()) { toast("Nama aset belum diisi", "Contoh: Emas Antam, BBCA, Reksa dana pasar uang.", "danger"); return svAssetForm(a, v); }
+  const price = num(v.price);
+  const obj = a || { id: uid(), created: Date.now() };
+  Object.assign(obj, { type: v.type, name: v.name.trim(), code: v.code.trim().toUpperCase(), goal: v.goal });
+  if (price > 0 && price !== +obj.price) { obj.price = price; obj.priceAt = Date.now(); }
+  if (!a) SV().assets.push(obj);
+  save(); renderSavings();
+  if (!a) { toast("Aset ditambahkan", `${obj.name}. Lanjutkan dengan mencatat pembelian.`, "ok"); svTxForm({ asset: obj.id, kind: "buy" }); }
+  return obj;
+}
+async function svUpdatePrice(a) {
+  const t = svType(a.type);
+  const v = await ask({ title: `Harga ${a.name}`, ok: "Simpan harga", body: `<div class="field"><label>${esc(t.price || "Harga per unit")} sekarang (Rp)</label><input name="price" type="number" step="any" class="num" value="${a.price || ""}"></div>
+    <p class="hint">Cek harga di aplikasi tempat Anda membeli (mis. Pegadaian, aplikasi sekuritas, Bibit, Indodax).</p>` });
+  if (!v) return; const p = num(v.price);
+  if (!(p > 0)) { toast("Harga tidak valid", "Isi angka lebih dari 0.", "danger"); return; }
+  a.price = p; a.priceAt = Date.now(); save(); renderSavings();
+}
+
+/* ---------- Transaksi ---------- */
+async function svTxForm(preset = {}, editTx) {
+  if (!SV().assets.length) { toast("Tambah aset dulu", "Transaksi dicatat untuk aset tertentu."); return svAssetForm(null); }
+  const x0 = { asset: SV().assets[0].id, kind: "buy", date: todayStr(), qty: "", price: "", fee: "", amount: "", total: "", note: "", ...(editTx || {}), ...preset };
+  if (!x0.price) { const a = svAsset(x0.asset); if (a && a.price) x0.price = a.price; }
+  const pr = ask({ title: editTx ? "Ubah transaksi" : "Catat transaksi", ok: "Simpan", body: `
+    <div class="row"><div class="field"><label>Aset</label><select name="asset" id="xAsset">${SV().assets.map(a => `<option value="${a.id}" ${a.id === x0.asset ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div>
+    <div class="field"><label>Jenis transaksi</label><select name="kind" id="xKind">${Object.entries(KIND_LABEL).map(([k, l]) => `<option value="${k}" ${k === x0.kind ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
+    <div class="field"><label>Tanggal</label><input name="date" type="date" value="${x0.date}"></div>
+    <div id="xUnit"><div class="row"><div class="field"><label id="xQtyLbl">Jumlah</label><input name="qty" id="xQty" type="number" step="any" class="num" value="${x0.qty}"></div>
+      <div class="field"><label id="xPriceLbl">Harga</label><input name="price" id="xPrice" type="number" step="any" class="num" value="${x0.price}"></div></div>
+      <div class="row"><div class="field"><label>Total (Rp)</label><input name="total" id="xTotal" type="number" step="any" class="num" value="${x0.total}" placeholder="isi total untuk menghitung jumlah"></div>
+      <div class="field"><label>Biaya / fee (Rp)</label><input name="fee" type="number" step="any" class="num" value="${x0.fee}"></div></div>
+      <p class="hint" id="xCalc"></p></div>
+    <div class="field" id="xAmtWrap"><label id="xAmtLbl">Nominal (Rp)</label><input name="amount" id="xAmt" type="number" step="any" class="num" value="${x0.amount}"></div>
+    <div class="field"><label>Catatan</label><input name="note" type="text" value="${esc(x0.note)}" placeholder="opsional"></div>` });
+  const mode = () => { const a = svAsset($("xAsset").value), t = svType(a.type), k = $("xKind").value;
+    return { a, t, k, unit: t.mode !== "nominal" && (k === "buy" || k === "sell") }; };
+  const sync = () => {
+    const m = mode();
+    $("xUnit").hidden = !m.unit; $("xAmtWrap").hidden = m.unit;
+    $("xAmtLbl").textContent = m.k === "income" ? "Nominal diterima (Rp)" : m.k === "fee" ? "Nominal biaya (Rp)" : m.k === "buy" ? "Nominal disetor (Rp)" : "Nominal ditarik (Rp)";
+    $("xQtyLbl").textContent = `Jumlah (${m.t.unit})`; $("xPriceLbl").textContent = (m.t.price || "Harga per unit") + " (Rp)";
+    if (m.unit && !$("xPrice").value && m.a.price) $("xPrice").value = m.a.price;
+    calc();
+  };
+  const calc = () => {
+    const m = mode(); if (!m.unit) return;
+    const q = num($("xQty").value), p = num($("xPrice").value), mult = m.t.mult || 1;
+    $("xCalc").textContent = q > 0 && p > 0 ? `${qtyFmt(q, m.t.dec)} ${m.t.unit} × ${rp(p)}${mult !== 1 ? " × " + mult : ""} = ${rp(q * p * mult)}` : (m.t.mult > 1 ? `1 ${m.t.unit} = ${m.t.mult} unit harga` : "");
+  };
+  $("xAsset").onchange = sync; $("xKind").onchange = sync;
+  $("xQty").oninput = () => { const m = mode(), q = num($("xQty").value), p = num($("xPrice").value); if (q > 0 && p > 0) $("xTotal").value = Math.round(q * p * (m.t.mult || 1)); calc(); };
+  $("xPrice").oninput = $("xQty").oninput;
+  $("xTotal").oninput = () => { const m = mode(), tot = num($("xTotal").value), p = num($("xPrice").value); if (tot > 0 && p > 0) $("xQty").value = +(tot / (p * (m.t.mult || 1))).toFixed(Math.min(8, m.t.dec ?? 4)); calc(); };
+  sync();
+  const v = await pr; if (!v) return null;
+  const a = svAsset(v.asset), t = svType(a.type), unit = t.mode !== "nominal" && (v.kind === "buy" || v.kind === "sell");
+  const tx = { id: editTx ? editTx.id : uid(), t: editTx ? editTx.t : Date.now().toString(36), asset: v.asset, kind: v.kind, date: v.date || todayStr(), note: v.note.trim() };
+  if (unit) {
+    tx.qty = num(v.qty); tx.price = num(v.price); tx.fee = num(v.fee) || 0;
+    if (!(tx.qty > 0) || !(tx.price > 0)) { toast("Jumlah dan harga wajib diisi", "Isi jumlah dan harga, atau total dan harga.", "danger"); return svTxForm(v, editTx); }
+    if (v.kind === "sell") { const st = assetStats(a); const avail = st.qty + (editTx && editTx.kind === "sell" ? +editTx.qty : 0); if (tx.qty > avail + 1e-9) { toast("Melebihi saldo", `Saldo ${a.name} hanya ${qtyFmt(avail, t.dec)} ${t.unit}.`, "danger"); return svTxForm(v, editTx); } }
+    if (!a.priceAt || new Date(tx.date).getTime() >= a.priceAt - 864e5) { a.price = tx.price; a.priceAt = Date.now(); }
+  } else {
+    const amt = num(v.amount);
+    if (!(amt > 0)) { toast("Nominal wajib diisi", "Isi nominal dalam rupiah.", "danger"); return svTxForm(v, editTx); }
+    if (t.mode === "nominal" && (v.kind === "buy" || v.kind === "sell")) { tx.qty = amt; tx.price = 1; tx.fee = 0; }
+    else tx.amount = amt;
+  }
+  if (editTx) Object.assign(editTx, tx); else SV().tx.push(tx);
+  save(); renderSavings();
+  toast("Transaksi dicatat", `${KIND_LABEL[tx.kind]} · ${a.name}`, "ok");
+  return tx;
+}
+function svRenderTx() {
+  const fa = $("svTxAsset").value, fk = $("svTxKind").value;
+  $("svTxAsset").innerHTML = `<option value="">Semua aset</option>` + SV().assets.map(a => `<option value="${a.id}" ${a.id === fa ? "selected" : ""}>${esc(a.name)}</option>`).join("");
+  const list = txSorted().reverse().filter(x => (!fa || x.asset === fa) && (!fk || x.kind === fk));
+  if (!list.length) { $("svTxBody").innerHTML = `<tr><td colspan="8" class="empty">Belum ada transaksi.</td></tr>`; return; }
+  $("svTxBody").innerHTML = list.map(x => {
+    const a = svAsset(x.asset) || { name: "(aset dihapus)", type: "" }, t = svType(a.type), unitTx = x.qty != null && t.mode !== "nominal";
+    const total = x.amount != null ? +x.amount : (+x.qty || 0) * (t.mode === "nominal" ? 1 : (t.mult || 1)) * (+x.price || 0);
+    const sign = x.kind === "sell" || x.kind === "income" ? "c-buy" : x.kind === "fee" ? "c-sell" : "";
+    return `<tr><td class="c-muted">${new Date(x.date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</td>
+      <td><b>${esc(a.name)}</b></td><td>${KIND_LABEL[x.kind]}</td>
+      <td class="num">${unitTx ? qtyFmt(+x.qty, t.dec) + " " + esc(t.unit) : "—"}</td><td class="num">${unitTx ? rp(+x.price) : "—"}</td>
+      <td class="num ${sign}">${rp(total)}${+x.fee ? `<br><small class="c-muted">fee ${rp(+x.fee)}</small>` : ""}</td>
+      <td class="wrap c-muted">${esc(x.note)}</td>
+      <td><div class="actions"><button class="btn sm ghost" data-svx="edit" data-id="${x.id}">Ubah</button><button class="btn sm ghost" data-svx="del" data-id="${x.id}" aria-label="Hapus">✕</button></div></td></tr>`;
+  }).join("");
+}
+$("svTxAsset").addEventListener("change", svRenderTx);
+$("svTxKind").addEventListener("change", svRenderTx);
+$("svTxBody").addEventListener("click", async e => {
+  const b = e.target.closest("[data-svx]"); if (!b) return;
+  const x = SV().tx.find(y => y.id === b.dataset.id); if (!x) return;
+  if (b.dataset.svx === "edit") return svTxForm({}, x);
+  if (await confirmBox("Hapus transaksi?", "Saldo dan perhitungan aset akan dihitung ulang.", "Hapus")) { SV().tx = SV().tx.filter(y => y.id !== x.id); save(); renderSavings(); }
+});
+$$("[data-svadd]").forEach(b => b.onclick = () => b.dataset.svadd === "asset" ? svAssetForm(null) : b.dataset.svadd === "goal" ? svGoalForm(null) : b.dataset.svadd === "plan" ? svPlanForm(null) : svTxForm({}));
+$("svExport").onclick = () => {
+  if (!SV().tx.length) { toast("Belum ada transaksi", "Tidak ada data untuk diekspor."); return; }
+  const rows = [["tanggal", "aset", "kode", "jenis_aset", "transaksi", "jumlah", "satuan", "harga", "fee", "nominal", "catatan"]];
+  txSorted().forEach(x => { const a = svAsset(x.asset) || {}, t = svType(a.type);
+    rows.push([x.date, a.name || "", a.code || "", t.name, KIND_LABEL[x.kind], x.qty ?? "", t.unit, x.price ?? "", x.fee ?? "", x.amount ?? "", x.note || ""]); });
+  download(`tabungan-${todayStr()}.csv`, "\ufeff" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n"), "text/csv");
+};
+
+/* ---------- Target ---------- */
+function goalStats(g) {
+  const assets = SV().assets.filter(a => a.goal === g.id);
+  const cur = assets.reduce((s, a) => s + assetStats(a).value, 0);
+  const now = new Date(), dl = g.deadline ? new Date(g.deadline) : null;
+  const months = dl ? Math.max(0, (dl.getFullYear() - now.getFullYear()) * 12 + dl.getMonth() - now.getMonth()) : NaN;
+  const i = (+g.ret || 0) / 100 / 12;
+  let need = NaN;
+  if (isFinite(months) && months > 0) {
+    const gap = g.target - cur * Math.pow(1 + i, months);
+    need = gap <= 0 ? 0 : i > 0 ? gap * i / (Math.pow(1 + i, months) - 1) : gap / months;
+  }
+  return { cur, pct: g.target > 0 ? cur / g.target * 100 : 0, months, need, assets };
+}
+function goalCard(g) {
+  const s = goalStats(g), done = s.pct >= 100;
+  return `<div class="goal" style="--gc:${g.color || "var(--brass)"}"><div class="goal-top"><b>${esc(g.name)}</b><span class="num">${pct(Math.min(s.pct, 999), 0)}</span></div>
+    <div class="bar"><i style="width:${clamp(s.pct, 0, 100)}%;background:${g.color || "var(--brass)"}"></i></div>
+    <div class="goal-sub"><span class="num">${rp(s.cur)} / ${rp(g.target)}</span><span>${g.deadline ? new Date(g.deadline).toLocaleDateString("id-ID", { month: "short", year: "numeric" }) : "tanpa tenggat"}</span></div>
+    <p class="hint">${done ? "🎉 Target tercapai." : isFinite(s.need) ? `Perlu ±<b class="num">${rp(s.need)}</b>/bulan selama ${s.months} bulan${+g.ret ? ` (asumsi imbal hasil ${g.ret}%/tahun)` : ""}.` : g.deadline ? "Tenggat sudah lewat." : "Atur tenggat untuk melihat setoran per bulan."}${s.assets.length ? "" : " Hubungkan aset ke target ini lewat tombol Ubah di tab Aset."}</p></div>`;
+}
+function svRenderGoals() {
+  $("svGoals").innerHTML = SV().goals.length ? SV().goals.map(g => goalCard(g) + `<div class="actions goal-act"><button class="btn sm ghost" data-svg="edit" data-id="${g.id}">Ubah</button><button class="btn sm ghost" data-svg="del" data-id="${g.id}">Hapus</button></div>`).map(h => `<div class="goal-wrap">${h}</div>`).join("")
+    : `<p class="empty">Belum ada target. Contoh: Dana darurat Rp30 juta, Umroh 2028, Pendidikan anak.</p>`;
+}
+$("svGoals").addEventListener("click", async e => {
+  const b = e.target.closest("[data-svg]"); if (!b) return;
+  const g = SV().goals.find(x => x.id === b.dataset.id); if (!g) return;
+  if (b.dataset.svg === "edit") return svGoalForm(g);
+  if (await confirmBox(`Hapus target ${g.name}?`, "Aset yang terhubung tidak ikut terhapus.", "Hapus")) {
+    SV().goals = SV().goals.filter(x => x.id !== g.id); SV().assets.forEach(a => { if (a.goal === g.id) a.goal = ""; }); save(); renderSavings();
+  }
+});
+const GOAL_COLORS = ["#E0B04B", "#2BC4A0", "#5AA9E6", "#B57BEA", "#F07C8A", "#F2A33A"];
+async function svGoalForm(g, preset = {}) {
+  const v0 = { name: "", target: "", deadline: "", ret: "", ...(g || {}), ...preset };
+  const v = await ask({ title: g ? "Ubah target" : "Target baru", ok: "Simpan", body: `
+    <div class="field"><label>Nama target</label><input name="name" type="text" value="${esc(v0.name)}" placeholder="mis. Dana darurat, Umroh 2028"></div>
+    <div class="row"><div class="field"><label>Jumlah target (Rp)</label><input name="target" type="number" step="any" class="num" value="${v0.target}"></div>
+    <div class="field"><label>Tenggat</label><input name="deadline" type="date" value="${v0.deadline}"></div></div>
+    <div class="field"><label>Asumsi imbal hasil per tahun (%, opsional)</label><input name="ret" type="number" step="0.1" class="num" value="${v0.ret}" placeholder="0 = tanpa asumsi"></div>
+    <p class="hint">Asumsi hanya untuk perkiraan setoran per bulan, bukan jaminan hasil.</p>` });
+  if (!v) return;
+  const target = num(v.target);
+  if (!v.name.trim() || !(target > 0)) { toast("Lengkapi target", "Isi nama dan jumlah target.", "danger"); return svGoalForm(g, v); }
+  const obj = g || { id: uid(), color: GOAL_COLORS[SV().goals.length % GOAL_COLORS.length] };
+  Object.assign(obj, { name: v.name.trim(), target, deadline: v.deadline, ret: num(v.ret) || 0 });
+  if (!g) SV().goals.push(obj);
+  save(); renderSavings();
+}
+
+/* ---------- Setoran rutin ---------- */
+function planStatus(p) {
+  const ym = thisYm(), done = (p.done || []).includes(ym), day = new Date().getDate();
+  return done ? "done" : day > p.day ? "late" : day === p.day ? "today" : "soon";
+}
+function streakText() {
+  const plans = SV().plans.filter(p => p.active); if (!plans.length) return "";
+  const allDone = ym => plans.every(p => (p.done || []).includes(ym));
+  let d = new Date(); d.setDate(1);
+  if (!allDone(thisYm())) d.setMonth(d.getMonth() - 1);
+  let n = 0;
+  while (n < 600) { const ym = d.toISOString().slice(0, 7); if (!allDone(ym)) break; n++; d.setMonth(d.getMonth() - 1); }
+  const total = plans.reduce((s, p) => s + (+p.amount || 0), 0);
+  return `Rencana ${rp(total)}/bulan · ${n ? `🔥 ${n} bulan berturut-turut konsisten` : "mulai bangun kebiasaan bulan ini"}`;
+}
+function planRow(p) {
+  const a = svAsset(p.asset), s = planStatus(p);
+  const lbl = { done: '<span class="pill buy">Sudah</span>', late: '<span class="pill high">Terlewat</span>', today: '<span class="pill med">Hari ini</span>', soon: '<span class="pill neu">Belum</span>' }[s];
+  return `<div class="plan-row"><div><b>${esc(a ? a.name : "(aset dihapus)")}</b><small class="c-muted">Tanggal ${p.day} · ${rp(p.amount)}</small></div>${lbl}
+    ${s === "done" ? `<button class="btn sm ghost" data-svp="undo" data-id="${p.id}">Batal</button>` : `<button class="btn sm primary" data-svp="do" data-id="${p.id}">Catat</button>`}</div>`;
+}
+function svRenderPlans() {
+  const plans = SV().plans;
+  $("svPlanStreak").innerHTML = plans.some(p => p.active) ? streakText() : "";
+  $("svPlans").innerHTML = plans.length ? plans.map(p => `<div class="plan-wrap${p.active ? "" : " off"}">${planRow(p)}<div class="actions"><button class="btn sm ghost" data-svp="toggle" data-id="${p.id}">${p.active ? "Jeda" : "Aktifkan"}</button><button class="btn sm ghost" data-svp="edit" data-id="${p.id}">Ubah</button><button class="btn sm ghost" data-svp="del" data-id="${p.id}">Hapus</button></div></div>`).join("")
+    : `<p class="empty">Belum ada jadwal. Contoh: beli emas Rp500.000 setiap tanggal 25.</p>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-svp]"); if (!b) return;
+  const p = SV().plans.find(x => x.id === b.dataset.id); if (!p) return;
+  const act = b.dataset.svp, ym = thisYm();
+  if (act === "do") {
+    const a = svAsset(p.asset); if (!a) return;
+    const t = svType(a.type), price = a.price > 0 ? +a.price : NaN;
+    const preset = t.mode === "nominal" ? { asset: a.id, kind: "buy", amount: p.amount, note: "Setoran rutin" }
+      : { asset: a.id, kind: "buy", total: p.amount, price: isFinite(price) ? price : "", qty: isFinite(price) ? +(p.amount / (price * (t.mult || 1))).toFixed(Math.min(8, t.dec ?? 4)) : "", note: "Setoran rutin" };
+    const tx = await svTxForm(preset);
+    if (tx) { p.done = [...new Set([...(p.done || []), ym])]; save(); renderSavings(); }
+  }
+  if (act === "undo") { p.done = (p.done || []).filter(x => x !== ym); save(); renderSavings(); }
+  if (act === "toggle") { p.active = !p.active; save(); renderSavings(); }
+  if (act === "edit") svPlanForm(p);
+  if (act === "del" && await confirmBox("Hapus jadwal?", "Riwayat transaksi tidak ikut terhapus.", "Hapus")) { SV().plans = SV().plans.filter(x => x.id !== p.id); save(); renderSavings(); }
+});
+async function svPlanForm(p, preset = {}) {
+  if (!SV().assets.length) { toast("Tambah aset dulu", "Jadwal rutin dibuat untuk aset tertentu."); return svAssetForm(null); }
+  const v0 = { asset: SV().assets[0].id, amount: "", day: 25, ...(p || {}), ...preset };
+  const v = await ask({ title: p ? "Ubah jadwal rutin" : "Jadwal setoran rutin", ok: "Simpan", body: `
+    <div class="field"><label>Aset</label><select name="asset">${SV().assets.map(a => `<option value="${a.id}" ${a.id === v0.asset ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div>
+    <div class="row"><div class="field"><label>Nominal per bulan (Rp)</label><input name="amount" type="number" step="any" class="num" value="${v0.amount}"></div>
+    <div class="field"><label>Tanggal setiap bulan (1–28)</label><input name="day" type="number" min="1" max="28" class="num" value="${v0.day}"></div></div>` });
+  if (!v) return;
+  const amount = num(v.amount), day = Math.round(num(v.day));
+  if (!(amount > 0) || !(day >= 1 && day <= 28)) { toast("Periksa isian", "Nominal lebih dari 0 dan tanggal 1–28.", "danger"); return svPlanForm(p, v); }
+  const obj = p || { id: uid(), active: true, done: [] };
+  Object.assign(obj, { asset: v.asset, amount, day });
+  if (!p) SV().plans.push(obj);
+  save(); renderSavings();
+}
+/** Pengingat sekali sehari saat aplikasi dibuka */
+function svRemind() {
+  const due = SV().plans.filter(p => p.active && ["today", "late"].includes(planStatus(p)));
+  if (!due.length) return;
+  const key = "svRemind:" + todayStr();
+  if (lsGet(key)) return; lsSet(key, "1");
+  toast("Setoran rutin", `${due.length} jadwal tabungan perlu dicatat bulan ini. Buka menu Tabungan → Rutin.`, "warn");
+}
+
+/* ---------- Proyeksi ---------- */
+function svRenderProj() {
+  if (!$("pjInit").value) { const P = portfolio(); $("pjInit").value = Math.round(P.value) || 0; $("pjMonthly").value = SV().plans.filter(p => p.active).reduce((s, p) => s + (+p.amount || 0), 0) || 1000000; }
+  const init = num($("pjInit").value) || 0, m = num($("pjMonthly").value) || 0, r = (num($("pjRet").value) || 0) / 100, yrs = clamp(Math.round(num($("pjYears").value) || 0), 1, 50), inf = (num($("pjInf").value) || 0) / 100;
+  const i = r / 12, val = [init], dep = [init];
+  let v = init, d = init;
+  for (let k = 1; k <= yrs * 12; k++) { v = v * (1 + i) + m; d += m; if (k % 12 === 0) { val.push(v); dep.push(d); } }
+  const real = v / Math.pow(1 + inf, yrs);
+  lineChart("pjChart", [{ pts: dep, color: getCss("--muted"), w: 1.5 }, { pts: val, color: getCss("--brass"), w: 2.5, fill: true }], {});
+  const k = (l, x, c = "") => `<div class="kpi"><span>${l}</span><b class="num ${c}">${x}</b></div>`;
+  $("pjOut").innerHTML = [k(`Perkiraan nilai setelah ${yrs} tahun`, rp(v)), k("Total yang disetor", rp(d)), k("Hasil investasi", rpS(v - d), "c-buy"),
+    k(`Daya beli setara hari ini (inflasi ${fmt(inf * 100, 1)}%)`, rp(real))].join("");
+}
+["pjInit", "pjMonthly", "pjRet", "pjYears", "pjInf"].forEach(id => $(id).addEventListener("input", svRenderProj));
+$("pjFromData").onclick = () => { $("pjInit").value = ""; svRenderProj(); };
+
+/* ---------- Jenis instrumen & alokasi ---------- */
+function svRenderTypes() {
+  $("svTypeBody").innerHTML = SV().types.map((t, i) => `<tr data-i="${i}">
+    <td><input type="color" data-k="color" value="${t.color}" aria-label="Warna"></td>
+    <td><input type="text" data-k="name" value="${esc(t.name)}" aria-label="Nama"></td>
+    <td><input type="text" data-k="unit" value="${esc(t.unit)}" aria-label="Satuan"></td>
+    <td><select data-k="mode" aria-label="Cara hitung"><option value="unit" ${t.mode === "unit" ? "selected" : ""}>Jumlah × harga</option><option value="nominal" ${t.mode === "nominal" ? "selected" : ""}>Nominal Rp</option></select></td>
+    <td><input type="number" data-k="mult" value="${t.mult || 1}" step="any" class="num" aria-label="Pengali" ${t.mode === "nominal" ? "disabled" : ""}></td>
+    <td><input type="text" data-k="price" value="${esc(t.price || "")}" aria-label="Label harga" ${t.mode === "nominal" ? "disabled" : ""}></td>
+    <td><input type="number" data-k="target" value="${t.target || 0}" step="1" class="num" aria-label="Target alokasi %"></td>
+    <td><button class="btn sm ghost" data-svt="${i}" aria-label="Hapus jenis">✕</button></td></tr>`).join("");
+  const tot = SV().types.reduce((s, t) => s + (+t.target || 0), 0);
+  $("svTypeHint").innerHTML = tot ? `Total target alokasi: <b class="num ${tot === 100 ? "c-buy" : "c-warn"}">${tot}%</b>${tot === 100 ? "" : " (sebaiknya 100%)"}` : "Isi kolom Target % jika ingin membandingkan alokasi aktual dengan rencana.";
+  // Perbandingan alokasi
+  const P = portfolio(), rows = SV().types.filter(t => (+t.target || 0) > 0 || (P.byType[t.id] || 0) > 0);
+  $("svRebal").innerHTML = !P.value ? `<p class="empty">Perbandingan muncul setelah ada aset bernilai.</p>` : rows.map(t => {
+    const act = (P.byType[t.id] || 0) / P.value * 100, tg = +t.target || 0, diff = tg ? (tg - act) / 100 * P.value : 0;
+    return `<div class="rebal"><div class="rebal-top"><span><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span><span class="num">${pct(act, 1)}${tg ? ` / target ${tg}%` : ""}</span></div>
+      <div class="rebal-bar"><i style="width:${clamp(act, 0, 100)}%;background:${t.color}"></i>${tg ? `<b style="left:${clamp(tg, 0, 100)}%"></b>` : ""}</div>
+      ${tg && Math.abs(act - tg) >= 5 ? `<small class="${diff > 0 ? "c-buy" : "c-warn"}">${diff > 0 ? "Kurang" : "Lebih"} ±${rp(Math.abs(diff))} dari target</small>` : ""}</div>`;
+  }).join("");
+}
+$("svTypeBody").addEventListener("change", e => {
+  const tr = e.target.closest("tr"), k = e.target.dataset.k; if (!tr || !k) return;
+  const t = SV().types[+tr.dataset.i];
+  t[k] = ["mult", "target"].includes(k) ? num(e.target.value) || 0 : e.target.value;
+  if (k === "mode") svRenderTypes();
+});
+$("svTypeBody").addEventListener("click", async e => {
+  const b = e.target.closest("[data-svt]"); if (!b) return;
+  const t = SV().types[+b.dataset.svt], used = SV().assets.some(a => a.type === t.id);
+  if (used) { toast("Jenis masih dipakai", `Masih ada aset berjenis ${t.name}. Pindahkan atau hapus asetnya dulu.`, "danger"); return; }
+  if (await confirmBox(`Hapus jenis ${t.name}?`, "Jenis ini akan hilang dari pilihan.", "Hapus")) { SV().types.splice(+b.dataset.svt, 1); save(); svRenderTypes(); }
+});
+$("svAddType").onclick = () => { SV().types.push({ id: "t" + uid(), name: "Jenis baru", unit: "unit", mult: 1, mode: "unit", dec: 4, color: "#7FD1D9", price: "Harga per unit", target: 0 }); svRenderTypes(); };
+$("svSaveTypes").onclick = () => {
+  const bad = SV().types.find(t => !t.name.trim() || !t.unit.trim() || (t.mode === "unit" && !(t.mult > 0)));
+  if (bad) { toast("Periksa jenis instrumen", "Nama, satuan, dan pengali harus terisi.", "danger"); return; }
+  save(); renderSavings(); toast("Jenis instrumen disimpan", "Perubahan berlaku untuk semua aset.", "ok");
+};
+
+/* ---------- Dua ruang: Trading & Investasi ---------- */
+const NAV_GROUP = { dash: "trade", pos: "trade", journal: "trade", stats: "trade", tools: "trade", news: "trade", save: "save", settings: "all" };
+/** Ruang aktif: "trade" atau "invest". Dibatasi oleh pengaturan menu (all / trade / save). */
+function curSpace() {
+  const m = S.settings.menu || "all";
+  if (m === "trade") return "trade";
+  if (m === "save") return "invest";
+  return S.settings.space === "invest" ? "invest" : "trade";
+}
+function applyMenu() {
+  const m = S.settings.menu || "all", sp = curSpace(), grp = sp === "invest" ? "save" : "trade";
+  $$(".nav-btn").forEach(b => { const g = NAV_GROUP[b.dataset.view]; b.hidden = !(g === "all" || g === grp); });
+  $$(".nav-label").forEach(l => l.hidden = l.dataset.group !== grp);
+  $$(".space-switch").forEach(w => w.hidden = m !== "all");
+  $$(".space-switch [data-space]").forEach(b => b.classList.toggle("on", b.dataset.space === sp));
+  document.body.dataset.menu = m; document.body.dataset.space = sp;
+}
+function setSpace(sp, silent) {
+  if ((S.settings.menu || "all") !== "all") { applyMenu(); return; }
+  if (S.settings.space !== sp) { S.settings.space = sp; save({ noSync: true }); }
+  applyMenu();
+  if (!silent) go(firstView());
+}
+function firstView() { return curSpace() === "invest" ? "save" : "dash"; }
+document.addEventListener("click", e => { const b = e.target.closest(".space-switch [data-space]"); if (b) { if (b.dataset.space === "invest") svTab = svTab || "sv-sum"; setSpace(b.dataset.space); } });
+document.addEventListener("click", e => { const b = e.target.closest("[data-sv-go]"); if (b) { svTab = b.dataset.svGo; renderSavings(); } });
+
+/* ================================================================
  * 13. PENGATURAN
  * ================================================================ */
 let authed = false;
@@ -1289,7 +1801,7 @@ $$(".tabs button").forEach(b => b.onclick = () => {
 
 function fillSettings() {
   const st = S.settings, set = (id, v) => $(id).value = v, chk = (id, v) => $(id).checked = !!v;
-  set("aBal", st.balance); $("aCcy").innerHTML = ccyOptions(st.ccy); set("aLev", st.leverage);
+  set("aBal", st.balance); $("aCcy").innerHTML = ccyOptions(st.ccy); set("aLev", st.leverage); set("aMenu", st.menu || "all");
   set("aMax", st.maxRisk); set("aWarn", st.warnAt); set("aPer", st.perTrade);
   set("aDay", st.dailyLoss); set("aWeek", st.weeklyLoss); set("aMinRR", st.minRR);
   set("aLotStep", st.lotStep); set("aNewsWin", st.newsWin);
@@ -1323,11 +1835,11 @@ $("saveAcc").onclick = () => {
     if (!(allowZero ? v >= 0 : v > 0)) { toast("Nilai tidak valid", `${names[k]} harus berupa angka ${allowZero ? "0 atau lebih" : "lebih dari 0"}.`, "danger"); return; }
   }
   const list = id => [...new Set($(id).value.split(",").map(s => s.trim()).filter(Boolean))];
-  Object.assign(S.settings, vals, { ccy: $("aCcy").value, block: $("aBlock").checked, lossLock: $("aLock").checked, corrWarn: $("aCorr").checked,
+  Object.assign(S.settings, vals, { menu: $("aMenu").value, ccy: $("aCcy").value, block: $("aBlock").checked, lossLock: $("aLock").checked, corrWarn: $("aCorr").checked,
     newsWarn: $("aNews").checked, autoBal: $("aAutoBal").checked, sound: $("aSound").checked, notif: $("aNotif").checked,
     setups: list("aSetups"), emotions: list("aEmos") });
   if (S.settings.notif && "Notification" in window && Notification.permission === "default") Notification.requestPermission();
-  save(); lastLevel = null; renderTagInputs(); onDataChange();
+  save(); lastLevel = null; renderTagInputs(); applyMenu(); onDataChange();
   toast("Pengaturan disimpan", "Semua perhitungan memakai nilai baru.", "ok");
 };
 $("saveCost").onclick = () => {
@@ -1428,7 +1940,7 @@ function applyData(d, t) {
   refreshAll();
 }
 function refreshAll() {
-  applyTheme(); renderTagInputs(); pickSym(resolveSym(S.last.sym) ? resolveSym(S.last.sym).s : "XAUUSD");
+  applyTheme(); applyMenu(); renderTagInputs(); pickSym(resolveSym(S.last.sym) ? resolveSym(S.last.sym).s : "XAUUSD");
   lastLevel = null; onDataChange();
   if (curView === "settings") showSettings();
 }
@@ -1613,15 +2125,24 @@ $("aFollowBal").onchange = () => { S.settings.followMt5Bal = $("aFollowBal").che
 function openOnboarding() {
   $("oCcy").innerHTML = ccyOptions(S.settings.ccy);
   $("oBal").value = S.settings.balance; $("oLev").value = S.settings.leverage; $("oMax").value = S.settings.maxRisk; $("oDay").value = S.settings.dailyLoss;
+  const om = S.settings.menu || "all"; $("oMenu").value = om; $("oTrade").hidden = om === "save";
+  $$("[data-omenu]").forEach(x => x.classList.toggle("on", x.dataset.omenu === om));
   $("onbModal").classList.add("open"); setTimeout(() => $("oBal").focus(), 80);
 }
+$$("[data-omenu]").forEach(c => c.onclick = () => {
+  $("oMenu").value = c.dataset.omenu;
+  $$("[data-omenu]").forEach(x => { x.classList.toggle("on", x === c); x.setAttribute("aria-checked", x === c); });
+  $("oTrade").hidden = c.dataset.omenu === "save";
+});
 $("oStart").onclick = () => {
-  const bal = num($("oBal").value), lev = num($("oLev").value), mx = num($("oMax").value), dl = num($("oDay").value), pin = $("oPin").value;
-  if (!(bal > 0) || !(lev > 0) || !(mx > 0) || !(dl >= 0)) { toast("Periksa isian", "Modal, leverage, dan batas risiko harus berupa angka lebih dari 0.", "danger"); return; }
+  const bal = num($("oBal").value), lev = num($("oLev").value), mx = num($("oMax").value), dl = num($("oDay").value), pin = $("oPin").value, menu = $("oMenu").value;
+  S.settings.menu = menu; S.settings.space = menu === "save" ? "invest" : "trade";
+  if (menu !== "save" && (!(bal > 0) || !(lev > 0) || !(mx > 0) || !(dl >= 0))) { toast("Periksa isian", "Modal, leverage, dan batas risiko harus berupa angka lebih dari 0.", "danger"); return; }
   if (pin && !/^\d{4,8}$/.test(pin)) { toast("PIN tidak valid", "Gunakan 4–8 angka, atau kosongkan.", "danger"); return; }
-  Object.assign(S.settings, { balance: bal, ccy: $("oCcy").value, leverage: lev, maxRisk: mx, dailyLoss: dl, weeklyLoss: dl * 2, onboarded: true });
+  if (menu !== "save") Object.assign(S.settings, { balance: bal, ccy: $("oCcy").value, leverage: lev, maxRisk: mx, dailyLoss: dl, weeklyLoss: dl * 2 });
+  S.settings.onboarded = true;
   if (pin) S.settings.pin = hash(pin);
-  save(); $("onbModal").classList.remove("open"); lastLevel = null; onDataChange();
+  save(); $("onbModal").classList.remove("open"); lastLevel = null; applyMenu(); onDataChange(); go(firstView());
   toast("Siap digunakan", pin ? "Pengaturan disimpan." : "PIN pengaturan: 1234. Ganti kapan saja di Pengaturan.", "ok");
 };
 
@@ -1648,14 +2169,15 @@ document.addEventListener("visibilitychange", () => {
 $("verTxt").textContent = "v" + VERSION;
 $("nCcy").innerHTML = NEWS_CCY.map(c => `<option>${c}</option>`).join("");
 $("lot").value = S.settings.lotStep >= 0.01 ? S.settings.lotStep : 0.01;
-applyTheme(); renderTagInputs(); pickSym(curSym);
+applyTheme(); applyMenu(); renderTagInputs(); pickSym(curSym);
 onDataChange();
 tick(); setInterval(tick, 30000);
 setInterval(() => { renderNewsSoon(); update(); if (curView === "pos") renderLive(); }, 60000);
 Cloud.chip();
 if (Cloud.sess && Cloud.cfg()) Cloud.afterLogin(false).catch(e => Cloud.fail(e));
 if (!S.settings.onboarded) openOnboarding();
-go(location.hash.slice(1) || "dash");
+go(location.hash.slice(1) || firstView());
+if (S.settings.onboarded) setTimeout(svRemind, 1500);
 
 // Ekspos minimal untuk debugging di konsol
 window.RiskDesk = { version: VERSION, get state() { return S; }, calc, parseMt5Html, parseCsvJournal };

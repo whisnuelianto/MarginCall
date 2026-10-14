@@ -296,3 +296,60 @@ td.wrap{white-space:normal;min-width:140px;max-width:280px}
   .pl{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- Tabungan ---------- */
+.subtabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:16px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.subtabs button{border:0;background:none;padding:8px 14px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:600;white-space:nowrap;font-size:14px}
+.subtabs button.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 -2px 0 var(--brass)}
+.subpane{display:none}.subpane.on{display:block}
+.alloc{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--panel2)}
+.alloc i{display:block;height:100%}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0 28px;margin-top:10px}
+.lg{display:grid;grid-template-columns:12px 1fr auto auto;gap:4px 10px;align-items:center;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+.lg b{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg .dot{margin:0}
+.lg > span:nth-child(5){grid-column:2 / -1;font-size:12px}
+.type-h{display:flex;align-items:center;gap:6px;margin:18px 0 6px;font-size:15px}
+.type-h .num{margin-left:auto;font-size:14px}
+.type-h:first-child{margin-top:0}
+.goal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.goal-grid.one{grid-template-columns:1fr}
+.goal-wrap{display:flex;flex-direction:column;gap:6px}
+.goal{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--input);border-top:3px solid var(--gc)}
+.goal-top{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}
+.goal-sub{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted);margin:8px 0 6px;flex-wrap:wrap}
+.goal .hint{margin:0}
+.goal-act{justify-content:flex-end}
+.plan-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.plan-row small{display:block}
+.plan-wrap{border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:4px}
+.plan-wrap .plan-row{border-bottom:0}
+.plan-wrap.off{opacity:.55}
+#svPlansMini .plan-row:last-child{border-bottom:0}
+.rebal{padding:10px 0;border-bottom:1px solid var(--line)}
+.rebal:last-child{border-bottom:0}
+.rebal-top{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;margin-bottom:6px}
+.rebal-bar{position:relative;height:10px;border-radius:5px;background:var(--panel2)}
+.rebal-bar i{display:block;height:100%;border-radius:5px}
+.rebal-bar b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text);border-radius:1px}
+.symtbl input[type=color]{width:38px;min-width:38px;height:30px;padding:2px;border-radius:7px;border:1px solid var(--line2);background:var(--input)}
+@media (max-width:900px){ .nav-btn{font-size:10px} .kpi b{font-size:15px;overflow-wrap:normal} body[data-menu="save"] .sessions{display:none} }
+
+/* ---------- Dua ruang: Trading | Investasi ---------- */
+.space-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:0 0 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.space-switch button{display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:none;padding:8px 6px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:700;font-size:13.5px}
+.space-switch button svg{width:15px;height:15px}
+.space-switch button.on{background:var(--brass);color:var(--brass-ink)}
+.space-switch.top{display:none}
+.nav-label{margin:4px 12px 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.space-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.space-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px;border-radius:12px;border:1px solid var(--line2);background:var(--input);cursor:pointer;color:var(--text)}
+.space-card b{font-size:15px}
+.space-card span{font-size:12.5px;color:var(--muted);line-height:1.45}
+.space-card.on{border-color:var(--brass);box-shadow:0 0 0 2px color-mix(in srgb,var(--brass) 35%,transparent);background:color-mix(in srgb,var(--brass) 8%,var(--input))}
+body[data-space="invest"] .trade-only{display:none}
+@media (max-width:900px){
+  .space-switch.top{display:grid;width:100%;margin:0;order:-1}
+  .nav .space-switch,.nav-label{display:none}
+}
+@media (max-width:560px){ .space-cards{grid-template-columns:1fr} }
