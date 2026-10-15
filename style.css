@@ -408,3 +408,19 @@ th.bsel,td.bsel{width:34px;padding-left:8px;padding-right:4px}
 .bulk-acts{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center}
 .bulk-acts select{width:auto;padding:5px 8px;font-size:13px;border-radius:8px}
 .linkbtn{background:none;border:0;color:var(--brass);font-weight:700;cursor:pointer;padding:0;text-decoration:underline}
+
+/* ---------- Fitur lanjutan ---------- */
+.rules-box{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px dashed var(--line2);border-radius:12px;background:var(--input)}
+.rule{display:flex;gap:9px;align-items:flex-start;font-size:14px;cursor:pointer}
+.rule input{width:18px;height:18px;accent-color:var(--brass);margin-top:1px;flex:none}
+body.privacy .num:not(input),body.privacy .kpi b,body.privacy .plbox b,body.privacy .big,body.privacy .bstat b,body.privacy .goal-sub,body.privacy .lg .num,body.privacy .hb-col{filter:blur(7px);transition:filter .15s}
+body.privacy .num:not(input):hover,body.privacy .kpi b:hover{filter:none}
+.lock-screen{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center;padding:20px}
+.lock-box{width:min(340px,100%);text-align:center}
+.lock-box input{text-align:center;font-size:24px;letter-spacing:.4em;font-family:var(--mono);margin-top:10px}
+body.locked .app{visibility:hidden}
+@media (max-width:900px){
+  .nav{overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
+  .nav::-webkit-scrollbar{display:none}
+  .nav-btn{min-width:54px;flex:1 0 54px}
+}

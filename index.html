@@ -48,9 +48,12 @@
   <button class="nav-btn" data-view="save" data-sub="sv-goals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg><span data-short="Target">Target</span></button>
   <button class="nav-btn" data-view="save" data-sub="sv-plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg><span data-short="Rutin">Setoran rutin</span></button>
   <button class="nav-btn" data-view="save" data-sub="sv-proj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span data-short="Hitung">Proyeksi</span></button>
+  <button class="nav-btn" data-view="save" data-sub="sv-zakat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 17.9l.9-5.4L4.2 8.7l5.4-.8z"/></svg><span data-short="Zakat">Zakat</span></button>
   <button class="nav-btn" data-view="save" data-sub="sv-types"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-short="Jenis">Jenis &amp; alokasi</span></button>
   <button class="nav-btn" data-view="fin" data-sub="fn-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg><span data-short="Utama">Ringkasan</span></button>
   <button class="nav-btn" data-view="fin" data-sub="fn-tx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4"/><path d="M17 20V4M21 16l-4 4-4-4"/></svg><span data-short="Mutasi">Transaksi</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 15h3M14 15h3"/></svg><span data-short="Budget">Anggaran</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-bills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg><span data-short="Tagihan">Tagihan &amp; cicilan</span></button>
   <button class="nav-btn" data-view="fin" data-sub="fn-pat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-6"/></svg><span data-short="Pola">Pola</span></button>
   <button class="nav-btn" data-view="fin" data-sub="fn-proj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span data-short="Proyek">Proyeksi</span></button>
   <button class="nav-btn" data-view="fin" data-sub="fn-plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9l7 4"/><circle cx="12" cy="12" r="9"/></svg><span data-short="Alokasi">Alokasi dana</span></button>
@@ -71,6 +74,7 @@
     <span class="clock num trade-only" id="clock"></span>
     <span class="chip" id="syncChip" data-tip="Status sinkronisasi cloud. Lokal = data hanya di perangkat ini. Klik untuk mengatur akun cloud."><i></i>Lokal</span>
     <button class="btn sm" id="installBtn" type="button" hidden>Install aplikasi</button>
+    <button class="icon-btn" id="privBtn" type="button" aria-label="Mode privasi"></button>
     <button class="icon-btn" id="helpBtn" type="button" aria-label="Cara pakai halaman ini" data-tip="Tampilkan cara pakai halaman ini">?</button>
     <button class="icon-btn" id="themeBtn" type="button" aria-label="Ganti tema terang/gelap" data-tip="Ganti tema terang / gelap"></button>
   </header>
@@ -151,6 +155,7 @@
           <div class="field"><label for="tp">Take profit <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Harga penutupan otomatis saat target untung tercapai.">?</span></label><input type="number" id="tp" class="num" step="any" inputmode="decimal"></div>
         </div>
         <p class="hint err" id="calcErr"></p>
+        <p class="hint" id="mt5Quote" hidden style="margin:-6px 0 10px"></p>
 
         <div class="row3 keep">
           <div class="field"><label for="slPips">SL (pip) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Isi jarak SL dalam pip, harga SL dihitung otomatis dari entry.">?</span></label><input type="number" id="slPips" class="num" step="any" placeholder="mis. 20"></div>
@@ -166,6 +171,8 @@
           <label>Kondisi emosi saat ini</label>
           <div class="tag-chips" id="emoChips"></div>
         </div>
+
+        <div class="field" id="rulesWrap" hidden><label>Aturan trading saya <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Centang aturan yang sudah terpenuhi sebelum entry. Atur daftar aturan di Pengaturan → Akun & risiko. Analitik membandingkan hasil trade yang patuh vs melanggar.">?</span></label><div id="rulesBox" class="rules-box"></div></div>
 
         <hr class="sep">
         <h2>Hitung lot dari risiko <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Tentukan berapa yang siap Anda rugikan (dalam % modal atau rupiah/dolar). Lot dihitung dari jarak SL.">?</span></h2>
@@ -312,7 +319,8 @@
     <section class="card">
       <div class="card-head">
         <div><h2>Ringkasan performa</h2><p class="sub">Dihitung dari jurnal trade.</p></div>
-        <select id="sPeriod" aria-label="Periode analitik" style="width:auto"><option value="all">Semua waktu</option><option value="7">7 hari</option><option value="30">30 hari</option><option value="90">90 hari</option></select>
+        <div class="actions"><button class="btn sm" type="button" data-report data-tip="Ringkasan trading, investasi, dan keuangan satu bulan, siap disimpan sebagai PDF.">Laporan bulanan</button>
+        <select id="sPeriod" aria-label="Periode analitik" style="width:auto"><option value="all">Semua waktu</option><option value="7">7 hari</option><option value="30">30 hari</option><option value="90">90 hari</option></select></div>
       </div>
       <div class="kpis" id="kpis"></div>
       <svg class="curve" id="curve" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Kurva ekuitas"></svg>
@@ -324,6 +332,7 @@
       <section class="card"><h2>Per hari</h2><p class="sub">Berdasarkan hari entry.</p><div id="byDay"></div></section>
       <section class="card"><h2>Per setup</h2><p class="sub">Setup mana yang benar-benar menghasilkan.</p><div id="bySetup"></div></section>
       <section class="card"><h2>Per emosi</h2><p class="sub">Kondisi emosi saat entry.</p><div id="byEmo"></div></section>
+      <section class="card"><h2>Patuh aturan vs melanggar</h2><p class="sub">Dari checklist aturan saat entry, atau diisi lewat Ubah di Jurnal.</p><div id="byRule"></div></section>
     </div>
   </section>
 
@@ -414,7 +423,7 @@
       <section class="card">
         <div class="card-head">
           <div><h2>Ringkasan tabungan</h2><p class="sub">Semua nilai dalam rupiah. Perbarui harga aset secara berkala agar nilainya akurat.</p></div>
-          <div class="actions"><button class="btn" data-svadd="asset" type="button" data-tip="Daftarkan tabungan baru, mis. Emas Antam, BBCA, ORI025, Bitcoin. Setelah itu langsung catat pembeliannya.">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button" data-tip="Catat beli, jual, dividen/kupon, atau biaya. Tips: isi Total (Rp) dan harga, jumlah dihitung otomatis.">Catat transaksi</button></div>
+          <div class="actions"><button class="btn" type="button" data-report>Laporan bulanan</button><button class="btn" data-svadd="asset" type="button" data-tip="Daftarkan tabungan baru, mis. Emas Antam, BBCA, ORI025, Bitcoin. Setelah itu langsung catat pembeliannya.">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button" data-tip="Catat beli, jual, dividen/kupon, atau biaya. Tips: isi Total (Rp) dan harga, jumlah dihitung otomatis.">Catat transaksi</button></div>
         </div>
         <div class="kpis" id="svKpis"></div>
         <div id="svTicker" class="tv-box" style="height:72px;margin-top:16px"></div>
@@ -427,6 +436,7 @@
       </section>
       <div class="grid2 even">
         <section class="card"><div class="card-head"><div><h2>Target</h2><p class="sub">Progres menuju tujuan menabung.</p></div><button class="btn sm" type="button" data-sv-go="sv-goals">Kelola</button></div><div id="svGoalsMini" class="goal-grid one"></div></section>
+        <section class="card"><h2>Agenda 60 hari</h2><p class="sub">Kupon dan jatuh tempo SBN/deposito.</p><div id="svAgenda"></div></section>
         <section class="card"><div class="card-head"><div><h2>Setoran rutin bulan ini</h2><p class="sub" id="svStreak"></p></div><button class="btn sm" type="button" data-sv-go="sv-plans">Kelola</button></div><div id="svPlansMini"></div></section>
       </div>
     </div>
@@ -461,6 +471,11 @@
           <button class="btn primary" data-svadd="goal" type="button" data-tip="Buat tujuan menabung beserta nominal dan tenggatnya.">Tambah target</button></div>
         <div id="svGoals" class="goal-grid"></div>
       </section>
+      <section class="card" style="margin-top:20px">
+        <h2>Target bersama keluarga</h2>
+        <p class="sub">Dilihat dan diisi bersama dari akun masing-masing anggota keluarga.</p>
+        <div id="famBox"></div>
+      </section>
     </div>
 
     <div class="subpane" id="sv-plans">
@@ -491,6 +506,31 @@
         <svg class="curve" id="pjChart" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Grafik proyeksi"></svg>
         <p class="hint"><span style="color:var(--brass)">━</span> perkiraan nilai &nbsp; <span class="c-muted">━ total disetor</span></p>
         <div class="kpis" id="pjOut" style="margin-top:12px"></div>
+      </section>
+    </div>
+
+    <div class="subpane" id="sv-zakat">
+      <div class="help-slot" data-help="sv-zakat"></div>
+      <section class="card">
+        <h2>Perkiraan zakat</h2>
+        <p class="sub">Zakat maal 2,5% bila harta bersih mencapai nisab (85 gram emas) dan sudah satu haul.</p>
+        <div class="kpis" id="zkK"></div>
+        <ul class="checks" id="zkNotes" style="margin-top:16px"></ul>
+      </section>
+      <section class="card" style="margin-top:20px">
+        <h2>Pengaturan perhitungan</h2>
+        <div class="row3">
+          <div class="field"><label for="zk_goldPrice">Harga emas / gram (Rp) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Kosongkan untuk memakai harga aset Emas Anda.">?</span></label><input type="number" id="zk_goldPrice" class="num" step="any" placeholder="otomatis"></div>
+          <div class="field"><label for="zk_nisabGram">Nisab (gram emas)</label><input type="number" id="zk_nisabGram" class="num" step="0.1"></div>
+          <div class="field"><label for="zk_haulStart">Awal haul <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Tanggal harta pertama kali mencapai nisab.">?</span></label><input type="date" id="zk_haulStart"></div>
+        </div>
+        <div class="row3">
+          <div class="field"><label for="zk_debts">Utang jatuh tempo (Rp) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Utang yang harus dibayar dalam waktu dekat, mengurangi harta terhitung.">?</span></label><input type="number" id="zk_debts" class="num" step="any"></div>
+          <div class="field"><label>&nbsp;</label><label class="switch" style="border:0;padding:6px 0"><span>Sertakan saldo rekening (Keuangan)</span><input type="checkbox" id="zk_bank"></label></div>
+          <div class="field"></div>
+        </div>
+        <p class="lbl" style="margin:0 0 6px">Jenis aset yang dihitung</p>
+        <div class="space-checks" id="zkInc"></div>
       </section>
     </div>
 
@@ -525,6 +565,9 @@
         <p class="hint"><span class="c-buy">■</span> masuk &nbsp; <span class="c-sell">■</span> keluar</p>
       </section>
       <div class="grid2 even">
+        <section class="card"><div class="card-head"><div><h2>Kekayaan bersih</h2><p class="sub">Rekening + investasi + trading − utang, per bulan.</p></div><button class="btn sm" type="button" data-report>Laporan bulanan</button></div>
+          <div class="kpis" id="fnNwK"></div><svg class="curve" id="fnNw" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Grafik kekayaan bersih"></svg></section>
+        <section class="card"><div class="card-head"><div><h2>Anggaran</h2><p class="sub">Kategori yang paling mendekati batas.</p></div><button class="btn sm" type="button" data-fn-go="fn-budget">Kelola</button></div><div id="fnBudMini"></div></section>
         <section class="card"><h2>Pengeluaran bulan ini per kategori</h2><p class="sub">Dibandingkan dengan rata-rata bulan sebelumnya.</p><div id="fnCats"></div></section>
         <section class="card"><div class="card-head"><div><h2>Rekening</h2><p class="sub">Saldo terakhir yang tercatat.</p></div><button class="btn sm" type="button" data-fn-go="fn-set">Kelola</button></div><div id="fnAccts"></div></section>
       </div>
@@ -541,6 +584,26 @@
         </div>
         <div class="bulk-bar" id="fnBulk" hidden></div>
         <div class="tbl-wrap"><table><thead><tr><th class="bsel"><input type="checkbox" id="fnAll" aria-label="Pilih semua"></th><th>Tanggal</th><th>Keterangan</th><th>Rekening</th><th>Kategori</th><th style="text-align:right">Nominal</th><th></th></tr></thead><tbody id="fnTxBody"></tbody></table></div>
+      </section>
+    </div>
+
+    <div class="subpane" id="fn-budget">
+      <div class="help-slot" data-help="fn-budget"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Anggaran bulan ini</h2><p class="sub">Isi batas pengeluaran per kategori. Peringatan muncul saat mencapai 80% dan 100%.</p></div>
+          <button class="btn sm" id="budFill" type="button" data-tip="Isi semua anggaran dari rata-rata pengeluaran 3 bulan terakhir.">Isi dari rata-rata</button></div>
+        <div class="kpis" id="budK"></div>
+        <div class="tbl-wrap" style="margin-top:14px"><table><thead><tr><th>Kategori</th><th>Anggaran / bulan</th><th>Terpakai</th><th>Sisa</th></tr></thead><tbody id="budBody"></tbody></table></div>
+      </section>
+    </div>
+
+    <div class="subpane" id="fn-bills">
+      <div class="help-slot" data-help="fn-bills"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Tagihan &amp; cicilan</h2><p class="sub">Status lunas terdeteksi otomatis dari mutasi, atau tandai manual.</p></div>
+          <button class="btn sm primary" id="billAdd" type="button">Tambah tagihan</button></div>
+        <div class="kpis" id="billK"></div>
+        <div class="tbl-wrap" style="margin-top:14px"><table><thead><tr><th>Tagihan</th><th>Per bulan</th><th>Bulan ini</th><th>Sisa utang</th><th></th></tr></thead><tbody id="billBody"></tbody></table></div>
       </section>
     </div>
 
@@ -681,6 +744,9 @@
             <div class="field"><label for="aSetups">Daftar setup (pisahkan dengan koma)</label><input type="text" id="aSetups"></div>
             <div class="field"><label for="aEmos">Daftar emosi (pisahkan dengan koma)</label><input type="text" id="aEmos"></div>
           </div>
+          <div class="field"><label for="aRules">Aturan trading pribadi (satu per baris) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Muncul sebagai checklist di kalkulator. Contoh: Sudah konfirmasi tren H4; Tidak entry saat berita; R:R minimal 1:2.">?</span></label><textarea id="aRules" rows="4" placeholder="Sudah konfirmasi tren H4&#10;Tidak entry 30 menit sebelum berita&#10;Tidak balas dendam setelah loss"></textarea></div>
+          <label class="switch"><span>Kunci aplikasi dengan PIN<small>Minta PIN setiap aplikasi dibuka dan setelah ditinggal beberapa menit.</small></span><input type="checkbox" id="aLock2"></label>
+          <div class="row"><div class="field"><label for="aLockMin">Kunci otomatis setelah tidak dibuka (menit)</label><input type="number" id="aLockMin" class="num" min="1"></div><div class="field"></div></div>
           <div style="text-align:right"><button class="btn primary" id="saveAcc" type="button">Simpan pengaturan</button></div>
         </div>
 
@@ -863,6 +929,18 @@
     </div>
     <div class="field"><label for="oPin">PIN pengaturan (4–8 angka)</label><input type="password" id="oPin" inputmode="numeric" maxlength="8" placeholder="Kosongkan untuk memakai 1234"></div>
     <div class="modal-foot"><button class="btn primary" id="oStart" type="button">Mulai</button></div>
+  </div>
+</div>
+
+<div class="lock-screen" id="lockScreen" hidden>
+  <div class="lock-box">
+    <div class="brand-mark" style="width:48px;height:48px;margin:0 auto 12px"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1405" stroke-width="2.4" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg></div>
+    <h2>RiskDesk terkunci</h2>
+    <p class="c-muted">Masukkan PIN untuk membuka.</p>
+    <input type="password" id="lockPin" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN">
+    <p class="hint err" id="lockErr" style="margin:8px 0"></p>
+    <button class="btn primary block" id="lockBtn" type="button">Buka</button>
+    <button class="linkbtn" id="lockForgot" type="button" style="margin-top:12px">Lupa PIN?</button>
   </div>
 </div>
 
