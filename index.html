@@ -295,9 +295,10 @@
         <select id="jPeriod" aria-label="Periode"><option value="all">Semua waktu</option><option value="1">Hari ini</option><option value="7">7 hari terakhir</option><option value="30">30 hari terakhir</option><option value="90">90 hari terakhir</option></select>
         <input type="text" id="jSearch" placeholder="Cari simbol, setup, atau catatan" aria-label="Cari jurnal">
       </div>
+      <div class="bulk-bar" id="hBulk" hidden></div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Ditutup</th><th>Simbol</th><th>Arah</th><th>Lot</th><th>Entry</th><th>Exit</th><th>Hasil</th><th>P/L</th><th>R</th><th>Setup</th><th>Emosi</th><th>Catatan</th><th></th></tr></thead>
+          <thead><tr><th class="bsel"><input type="checkbox" id="hAll" aria-label="Pilih semua"></th><th>Ditutup</th><th>Simbol</th><th>Arah</th><th>Lot</th><th>Entry</th><th>Exit</th><th>Hasil</th><th>P/L</th><th>R</th><th>Setup</th><th>Emosi</th><th>Catatan</th><th></th></tr></thead>
           <tbody id="histBody"></tbody>
         </table>
       </div>
@@ -448,7 +449,8 @@
           <select id="svTxAsset" aria-label="Filter aset"><option value="">Semua aset</option></select>
           <select id="svTxKind" aria-label="Filter jenis"><option value="">Semua transaksi</option><option value="buy">Beli / setor</option><option value="sell">Jual / tarik</option><option value="income">Dividen / kupon / bunga</option><option value="fee">Biaya</option></select>
         </div>
-        <div class="tbl-wrap"><table><thead><tr><th>Tanggal</th><th>Aset</th><th>Transaksi</th><th>Jumlah</th><th>Harga</th><th>Total</th><th>Catatan</th><th></th></tr></thead><tbody id="svTxBody"></tbody></table></div>
+        <div class="bulk-bar" id="svBulk" hidden></div>
+        <div class="tbl-wrap"><table><thead><tr><th class="bsel"><input type="checkbox" id="svAll" aria-label="Pilih semua"></th><th>Tanggal</th><th>Aset</th><th>Transaksi</th><th>Jumlah</th><th>Harga</th><th>Total</th><th>Catatan</th><th></th></tr></thead><tbody id="svTxBody"></tbody></table></div>
       </section>
     </div>
 
@@ -532,12 +534,13 @@
       <div class="help-slot" data-help="fn-tx"></div>
       <section class="card">
         <div class="card-head"><div><h2>Transaksi</h2><p class="sub" id="fnTxSum"></p></div>
-          <div class="actions"><button class="btn sm" id="fnPasteBtn" type="button" data-tip="Jika PDF tidak terbaca: salin tabel mutasi dari PDF lalu tempel di sini.">Tempel teks mutasi</button><button class="btn sm" data-fnadd="manual" type="button">Catat manual</button><button class="btn sm primary" data-fnadd="import" type="button" data-tip="PDF e-statement, Excel, atau CSV.">Import mutasi</button></div></div>
+          <div class="actions"><button class="btn sm" id="fnDupBtn" type="button" data-tip="Cari dan hapus transaksi yang tersimpan dobel karena file yang sama diimport lebih dari sekali.">Cari transaksi ganda</button><button class="btn sm" id="fnPasteBtn" type="button" data-tip="Jika PDF tidak terbaca: salin tabel mutasi dari PDF lalu tempel di sini.">Tempel teks mutasi</button><button class="btn sm" data-fnadd="manual" type="button">Catat manual</button><button class="btn sm primary" data-fnadd="import" type="button" data-tip="PDF e-statement, Excel, atau CSV.">Import mutasi</button></div></div>
         <div class="filters">
           <select id="fnFMonth" aria-label="Bulan"></select><select id="fnFAcct" aria-label="Rekening"></select><select id="fnFCat" aria-label="Kategori"></select>
           <input type="text" id="fnFSearch" placeholder="Cari keterangan" aria-label="Cari">
         </div>
-        <div class="tbl-wrap"><table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Rekening</th><th>Kategori</th><th style="text-align:right">Nominal</th><th></th></tr></thead><tbody id="fnTxBody"></tbody></table></div>
+        <div class="bulk-bar" id="fnBulk" hidden></div>
+        <div class="tbl-wrap"><table><thead><tr><th class="bsel"><input type="checkbox" id="fnAll" aria-label="Pilih semua"></th><th>Tanggal</th><th>Keterangan</th><th>Rekening</th><th>Kategori</th><th style="text-align:right">Nominal</th><th></th></tr></thead><tbody id="fnTxBody"></tbody></table></div>
       </section>
     </div>
 
@@ -829,7 +832,8 @@
     <div class="tbl-wrap" style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px">
       <table><thead><tr><th><button class="btn sm ghost" id="fnImpAll" type="button" data-tip="Centang / hapus centang semua">✓</button></th><th>Tgl</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th></th></tr></thead><tbody id="fnImpBody"></tbody></table>
     </div>
-    <p class="hint" style="margin-top:10px">Baris kuning = arah masuk/keluar perlu dicek (klik ⇄ untuk membalik). Baris "sudah ada" tidak dicentang agar tidak dobel.</p>
+    <p class="hint" id="fnImpWarn" style="margin-top:10px;font-weight:600"></p>
+    <p class="hint" style="margin-top:4px">Baris kuning = arah masuk/keluar perlu dicek (klik ⇄ untuk membalik). Baris "sudah ada" tidak dicentang agar tidak dobel.</p>
     <div class="modal-foot"><button class="btn ghost" id="fnImpCancel" type="button">Batal</button><button class="btn primary" id="fnImpSave" type="button">Simpan transaksi</button></div>
   </div>
 </div>
