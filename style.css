@@ -29,7 +29,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 a{color:var(--brass)}
 
 /* ---------- Layout ---------- */
-.app{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:100vh}
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
 .nav{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:3px;padding:18px 14px;border-right:1px solid var(--line);background:color-mix(in srgb,var(--bg2) 75%,transparent)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em;padding:2px 8px 20px}
 .brand small{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:500;margin-left:auto}
@@ -369,3 +369,34 @@ body[data-space="invest"] .trade-only{display:none}
 .hist div span:last-child{text-align:right}
 
 .stale-banner{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:130;display:flex;gap:12px;align-items:center;background:var(--warn);color:#1a1405;font-weight:600;font-size:14px;padding:10px 14px;border-radius:12px;box-shadow:var(--shadow);max-width:calc(100% - 24px)}
+
+/* ---------- Keuangan ---------- */
+.modal-box.xwide{width:min(1000px,100%)}
+.hbars{display:flex;align-items:flex-end;gap:6px;height:190px;padding-top:6px;overflow-x:auto}
+.hb-col{flex:1;min-width:34px;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.hb-bars{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid var(--line2)}
+.hb-bars i{display:block;width:42%;max-width:22px;border-radius:4px 4px 0 0;min-height:1px;transition:height .3s}
+.hb-col span{font-size:11px;color:var(--muted);white-space:nowrap}
+tr.row-dup td{opacity:.5}
+.space-checks{display:flex;gap:18px;flex-wrap:wrap;padding:8px 0}
+.space-checks label{display:flex;gap:8px;align-items:center;font-weight:600;color:var(--text);cursor:pointer}
+.space-checks input{width:18px;height:18px;accent-color:var(--brass)}
+.fn-cat{padding:5px 8px;font-size:13px;border-radius:8px;min-width:150px}
+#fnImpBody select{padding:5px 8px;font-size:12.5px;border-radius:8px;min-width:140px}
+#fnImpBody td{padding:6px 8px}
+@media (max-width:900px){ .space-switch button{font-size:12px;padding:8px 2px;gap:4px} .space-switch button svg{display:none} }
+
+.space-switch.three button{flex-direction:column;gap:3px;font-size:11.5px;padding:7px 2px;min-width:0}
+.space-switch.three button svg{display:block!important;width:16px;height:16px}
+body[data-space="fin"] .trade-only{display:none}
+@media (max-width:900px){ .space-switch.three button{flex-direction:row;font-size:12px} .space-switch.three button svg{display:none!important} }
+
+/* ---------- Pasar (TradingView) ---------- */
+.tv-box{position:relative;width:100%;border-radius:10px;overflow:hidden}
+.tv-box .tradingview-widget-copyright{font-size:11px;text-align:right;padding-top:4px;color:var(--muted)}
+.tv-box .tradingview-widget-copyright a{color:var(--muted);text-decoration:none}
+.tv-ticker{padding:8px 12px}
+.chips-row{display:flex;gap:6px;flex-wrap:wrap}
+.chipbtn{border:1px solid var(--line2);background:transparent;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--muted);font-weight:600}
+.chipbtn.on{background:color-mix(in srgb,var(--brass) 18%,transparent);border-color:var(--brass);color:var(--text)}
+@media (max-width:900px){ #mkChart{height:420px!important} #mkOverview,#mkCal{height:440px!important} }

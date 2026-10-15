@@ -30,13 +30,16 @@
   <div class="space-switch" role="group" aria-label="Pilih ruang">
     <button type="button" data-space="trade" data-tip="Ruang Trading: kalkulator risiko MT5, posisi, jurnal, analitik."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Trading</button>
     <button type="button" data-space="invest" data-tip="Ruang Investasi: tabungan emas, saham, SBN, reksa dana, kripto."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Investasi</button>
+    <button type="button" data-space="fin" data-tip="Ruang Keuangan: arus kas, import mutasi bank, pola, proyeksi, dan alokasi dana."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>Keuangan</button>
   </div>
   <p class="nav-label" data-group="trade">Trading</p>
-  <p class="nav-label" data-group="save">Investasi</p>
-  <button class="nav-btn on" data-view="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13a9 9 0 1 1 18 0"/><path d="M12 13l4-4"/><path d="M3 19h18"/></svg><span data-short="Beranda">Dashboard</span></button>
+  <p class="nav-label" data-group="invest">Investasi</p>
+  <p class="nav-label" data-group="fin">Keuangan</p>
+  <button class="nav-btn on" data-view="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13a9 9 0 1 1 18 0"/><path d="M12 13l4-4"/><path d="M3 19h18"/></svg><span data-short="Utama">Dashboard</span></button>
+  <button class="nav-btn" data-view="market"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16v-5M11 16V7M15 16v-3M19 16V9"/></svg><span>Pasar</span></button>
   <button class="nav-btn" data-view="pos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg><span>Posisi</span><b class="badge-n" id="navPosN"></b></button>
   <button class="nav-btn" data-view="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 3h11l3 3v15H5z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg><span>Jurnal</span></button>
-  <button class="nav-btn" data-view="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg><span>Analitik</span></button>
+  <button class="nav-btn" data-view="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg><span data-short="Hasil">Analitik</span></button>
   <button class="nav-btn" data-view="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg><span>Alat</span></button>
   <button class="nav-btn" data-view="news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Berita</span><b class="badge-n" id="navNewsN"></b></button>
   <button class="nav-btn" data-view="save" data-sub="sv-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9v9z"/><path d="M14 3.3A9 9 0 0 1 20.7 10H14z"/></svg><span data-short="Utama">Ringkasan</span></button>
@@ -46,6 +49,12 @@
   <button class="nav-btn" data-view="save" data-sub="sv-plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg><span data-short="Rutin">Setoran rutin</span></button>
   <button class="nav-btn" data-view="save" data-sub="sv-proj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span data-short="Hitung">Proyeksi</span></button>
   <button class="nav-btn" data-view="save" data-sub="sv-types"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-short="Jenis">Jenis &amp; alokasi</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg><span data-short="Utama">Ringkasan</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-tx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4"/><path d="M17 20V4M21 16l-4 4-4-4"/></svg><span data-short="Mutasi">Transaksi</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-pat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-6"/></svg><span data-short="Pola">Pola</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-proj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span data-short="Proyek">Proyeksi</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9l7 4"/><circle cx="12" cy="12" r="9"/></svg><span data-short="Alokasi">Alokasi dana</span></button>
+  <button class="nav-btn" data-view="fin" data-sub="fn-set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="15" r="3"/></svg><span data-short="Kelola">Kategori &amp; rekening</span></button>
   <button class="nav-btn" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span data-short="Atur">Pengaturan</span></button>
   <div class="nav-foot">Data tersimpan di perangkat ini<span id="navCloud"></span>.</div>
 </nav>
@@ -55,6 +64,7 @@
     <div class="space-switch top" role="group" aria-label="Pilih ruang">
     <button type="button" data-space="trade" data-tip="Ruang Trading: kalkulator risiko MT5, posisi, jurnal, analitik."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Trading</button>
     <button type="button" data-space="invest" data-tip="Ruang Investasi: tabungan emas, saham, SBN, reksa dana, kripto."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Investasi</button>
+    <button type="button" data-space="fin" data-tip="Ruang Keuangan: arus kas, import mutasi bank, pola, proyeksi, dan alokasi dana."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>Keuangan</button>
   </div>
     <h1 id="viewTitle">Dashboard</h1>
     <div class="sessions trade-only" id="sessions" aria-label="Sesi pasar"></div>
@@ -209,6 +219,30 @@
         <div id="newsSoon"></div>
       </section>
     </div>
+  </section>
+
+  <!-- ================= PASAR ================= -->
+  <section class="view" id="v-market">
+    <div class="help-slot" data-help="market"></div>
+    <p class="note-box" id="mkOffline" hidden>Harga pasar dan grafik membutuhkan koneksi internet.</p>
+    <div class="card tv-ticker"><div id="mkTicker" class="tv-box" style="height:72px"></div></div>
+    <section class="card" style="margin-top:20px">
+      <div class="card-head"><div><h2>Grafik live</h2><p class="sub">Simbol: <b class="num" id="mkSymTxt"></b>. Ganti simbol langsung di grafik, atau pilih di bawah.</p></div>
+        <button class="btn sm" id="mkUseCalc" type="button" data-tip="Tampilkan grafik pair yang sedang dipilih di kalkulator Dashboard.">Pair di kalkulator</button></div>
+      <div class="chips-row" id="mkChips"></div>
+      <div id="mkChart" class="tv-box" style="height:540px;margin-top:12px"></div>
+    </section>
+    <div class="grid2 even">
+      <section class="card"><h2>Ringkasan pasar</h2><p class="sub">Indeks, forex, komoditas, kripto, dan saham IDX.</p><div id="mkOverview" class="tv-box" style="height:520px"></div></section>
+      <section class="card"><h2>Kalender ekonomi</h2><p class="sub">Berita berdampak sedang–tinggi. Untuk peringatan di kalkulator, tambahkan juga di menu Berita.</p><div id="mkCal" class="tv-box" style="height:520px"></div></section>
+    </div>
+    <section class="card" style="margin-top:20px">
+      <h2>Daftar pantauan</h2>
+      <p class="sub">Simbol untuk pita harga di atas, format <span class="num">BURSA:KODE</span> seperti di TradingView, dipisah koma. Contoh: <span class="num">IDX:BBCA, OANDA:XAUUSD, FX:GBPUSD, BINANCE:BTCUSDT</span>.</p>
+      <textarea id="mkWatch" rows="3" class="num" style="font-size:13px"></textarea>
+      <div class="actions" style="margin-top:10px"><button class="btn primary sm" id="mkSaveWatch" type="button">Simpan daftar</button><button class="btn ghost sm" id="mkResetWatch" type="button">Kembalikan bawaan</button></div>
+      <p class="hint" style="margin-top:10px">Widget disediakan gratis oleh TradingView dan hanya untuk ditampilkan. Sebagian bursa (mis. IDX) dapat tertunda atau tidak tersedia di widget. Harga broker Anda di MT5 bisa sedikit berbeda.</p>
+    </section>
   </section>
 
   <!-- ================= POSISI ================= -->
@@ -382,6 +416,7 @@
           <div class="actions"><button class="btn" data-svadd="asset" type="button" data-tip="Daftarkan tabungan baru, mis. Emas Antam, BBCA, ORI025, Bitcoin. Setelah itu langsung catat pembeliannya.">Tambah aset</button><button class="btn primary" data-svadd="tx" type="button" data-tip="Catat beli, jual, dividen/kupon, atau biaya. Tips: isi Total (Rp) dan harga, jumlah dihitung otomatis.">Catat transaksi</button></div>
         </div>
         <div class="kpis" id="svKpis"></div>
+        <div id="svTicker" class="tv-box" style="height:72px;margin-top:16px"></div>
         <h3 style="margin:20px 0 8px">Alokasi aset</h3>
         <div class="alloc" id="svAllocBar"></div>
         <div class="legend" id="svAllocLegend"></div>
@@ -473,6 +508,116 @@
     </div>
   </section>
 
+  <!-- ================= KEUANGAN ================= -->
+  <section class="view" id="v-fin">
+    <input type="file" id="fnImportFile" accept="application/pdf,.pdf,.xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" multiple hidden>
+
+    <div class="subpane on" id="fn-sum">
+      <div class="help-slot" data-help="fn-sum"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Arus kas</h2><p class="sub">Pindah dana ke investasi, trading, atau rekening sendiri tidak dihitung sebagai pengeluaran.</p></div>
+          <div class="actions"><button class="btn" data-fnadd="manual" type="button" data-tip="Catat pemasukan/pengeluaran tunai atau transaksi lain secara manual.">Catat manual</button><button class="btn primary" data-fnadd="import" type="button" data-tip="Pilih PDF e-statement, Excel (.xlsx/.xls), atau CSV. Bisa beberapa file sekaligus. File dibaca di perangkat ini saja, tidak diunggah ke server.">Import mutasi</button></div></div>
+        <div class="kpis" id="fnKpis"></div>
+        <h3 style="margin:20px 0 6px">Pemasukan vs pengeluaran per bulan</h3>
+        <div id="fnBars"></div>
+        <p class="hint"><span class="c-buy">■</span> masuk &nbsp; <span class="c-sell">■</span> keluar</p>
+      </section>
+      <div class="grid2 even">
+        <section class="card"><h2>Pengeluaran bulan ini per kategori</h2><p class="sub">Dibandingkan dengan rata-rata bulan sebelumnya.</p><div id="fnCats"></div></section>
+        <section class="card"><div class="card-head"><div><h2>Rekening</h2><p class="sub">Saldo terakhir yang tercatat.</p></div><button class="btn sm" type="button" data-fn-go="fn-set">Kelola</button></div><div id="fnAccts"></div></section>
+      </div>
+    </div>
+
+    <div class="subpane" id="fn-tx">
+      <div class="help-slot" data-help="fn-tx"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Transaksi</h2><p class="sub" id="fnTxSum"></p></div>
+          <div class="actions"><button class="btn sm" id="fnPasteBtn" type="button" data-tip="Jika PDF tidak terbaca: salin tabel mutasi dari PDF lalu tempel di sini.">Tempel teks mutasi</button><button class="btn sm" data-fnadd="manual" type="button">Catat manual</button><button class="btn sm primary" data-fnadd="import" type="button" data-tip="PDF e-statement, Excel, atau CSV.">Import mutasi</button></div></div>
+        <div class="filters">
+          <select id="fnFMonth" aria-label="Bulan"></select><select id="fnFAcct" aria-label="Rekening"></select><select id="fnFCat" aria-label="Kategori"></select>
+          <input type="text" id="fnFSearch" placeholder="Cari keterangan" aria-label="Cari">
+        </div>
+        <div class="tbl-wrap"><table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Rekening</th><th>Kategori</th><th style="text-align:right">Nominal</th><th></th></tr></thead><tbody id="fnTxBody"></tbody></table></div>
+      </section>
+    </div>
+
+    <div class="subpane" id="fn-pat">
+      <div class="help-slot" data-help="fn-pat"></div>
+      <div class="grid2 even" style="margin-top:0">
+        <section class="card"><h2>Kategori yang naik</h2><p class="sub">Bulan ini vs rata-rata 3 bulan sebelumnya.</p><div id="fnUp"></div></section>
+        <section class="card"><h2>Kategori yang turun</h2><p class="sub">Penghematan dibanding biasanya.</p><div id="fnDown"></div></section>
+        <section class="card"><h2>Transaksi rutin</h2><p class="sub">Muncul tiap bulan dengan nominal mirip: langganan, cicilan, gaji.</p><div id="fnRec"></div></section>
+        <section class="card"><h2>Transaksi terbesar bulan ini</h2><p class="sub">Lima pengeluaran terbesar.</p><div id="fnBig"></div></section>
+        <section class="card"><h2>Hari paling boros</h2><p class="sub">Total pengeluaran per hari dalam 6 bulan terakhir.</p><div id="fnWd"></div></section>
+        <section class="card"><h2>Awal, tengah, akhir bulan</h2><p class="sub">Kapan uang paling banyak keluar.</p><div id="fnPart"></div></section>
+        <section class="card"><h2>Rasio menabung per bulan</h2><p class="sub">Surplus dibanding pemasukan.</p><div id="fnRate"></div></section>
+      </div>
+    </div>
+
+    <div class="subpane" id="fn-proj">
+      <div class="help-slot" data-help="fn-proj"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Proyeksi saldo</h2><p class="sub" id="fnProjNote"></p></div>
+          <div class="field" style="margin:0;width:170px"><label for="fnHz">Lihat ke depan (bulan)</label><input type="number" id="fnHz" class="num" value="6" min="1" max="24"></div></div>
+        <div class="kpis" id="fnProjK"></div>
+        <svg class="curve" id="fnProjChart" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Grafik proyeksi saldo"></svg>
+        <p class="hint">Titik pertama = saldo sekarang, titik kedua = perkiraan akhir bulan ini, berikutnya per bulan.</p>
+      </section>
+      <section class="card" style="margin-top:20px"><h2>Tagihan rutin yang belum terbayar bulan ini</h2><p class="sub">Berdasarkan pola bulan-bulan sebelumnya.</p><div id="fnProjRec"></div></section>
+    </div>
+
+    <div class="subpane" id="fn-plan">
+      <div class="help-slot" data-help="fn-plan"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Kondisi saat ini</h2><p class="sub">Menggabungkan data Keuangan, Investasi, dan modal Trading.</p></div></div>
+        <div class="kpis" id="fnPlanK"></div>
+      </section>
+      <div class="grid2" style="margin-top:20px">
+        <section class="card">
+          <h2>Rencana alokasi surplus bulanan</h2>
+          <p class="sub">Dihitung dari aturan di samping. Bukan saran investasi.</p>
+          <div class="alloc" id="fnPlanBar" style="height:22px"></div>
+          <div id="fnPlanList" style="margin-top:10px"></div>
+          <ul class="checks" id="fnPlanNotes" style="margin-top:16px"></ul>
+        </section>
+        <section class="card">
+          <h2>Aturan Anda</h2>
+          <p class="sub">Pilih template lalu sesuaikan. Tersimpan otomatis.</p>
+          <div class="actions" style="margin-bottom:14px"><button class="btn sm" data-preset="konservatif" type="button">Konservatif</button><button class="btn sm" data-preset="seimbang" type="button">Seimbang</button><button class="btn sm" data-preset="agresif" type="button">Agresif</button></div>
+          <div class="row">
+            <div class="field"><label for="fr_months">Dasar rata-rata (bulan) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Berapa bulan terakhir yang dipakai untuk menghitung rata-rata pemasukan & pengeluaran.">?</span></label><input type="number" id="fr_months" class="num" min="1" max="12"></div>
+            <div class="field"><label for="fr_emMonths">Target dana darurat (× pengeluaran) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Contoh 6 = dana darurat sebesar 6 bulan pengeluaran rata-rata.">?</span></label><input type="number" id="fr_emMonths" class="num" step="0.5"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="fr_emPct">% surplus ke dana darurat <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Selama dana darurat belum penuh, bagian surplus ini dialokasikan ke dana darurat terlebih dahulu.">?</span></label><input type="number" id="fr_emPct" class="num"></div>
+            <div class="field"><label for="fr_emExtra">Dana darurat di luar Investasi (Rp) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Dana darurat dihitung dari aset Tunai/dana darurat di ruang Investasi. Tambahkan di sini jika ada yang belum dicatat di sana.">?</span></label><input type="number" id="fr_emExtra" class="num" step="any"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="fr_invPct">% sisa ke investasi <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Dari sisa surplus setelah dana darurat.">?</span></label><input type="number" id="fr_invPct" class="num"></div>
+            <div class="field"><label for="fr_tradePct">% sisa ke modal trading <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Dari sisa surplus setelah dana darurat. Otomatis 0 jika dana darurat < 1 bulan atau porsi trading melewati batas.">?</span></label><input type="number" id="fr_tradePct" class="num"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="fr_maxTradeShare">Batas porsi trading (% kekayaan) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Modal trading maksimal sekian persen dari total kekayaan tercatat.">?</span></label><input type="number" id="fr_maxTradeShare" class="num"></div>
+            <div class="field"><label for="fr_buffer">Penyangga di rekening (× pengeluaran) <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Uang yang tetap disisakan di rekening untuk kebutuhan tak terduga, mis. 1 = sebulan pengeluaran.">?</span></label><input type="number" id="fr_buffer" class="num" step="0.5"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="subpane" id="fn-set">
+      <div class="help-slot" data-help="fn-set"></div>
+      <section class="card">
+        <div class="card-head"><div><h2>Rekening</h2><p class="sub">Dibuat otomatis saat import, atau tambah manual.</p></div><button class="btn sm primary" id="fnAddAcct" type="button">Tambah rekening</button></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Rekening</th><th>Saldo acuan</th><th>Saldo sekarang</th><th></th></tr></thead><tbody id="fnAcctBody"></tbody></table></div>
+      </section>
+      <section class="card" style="margin-top:20px">
+        <div class="card-head"><div><h2>Kategori &amp; kata kunci</h2><p class="sub">Kata kunci (pisahkan koma) dicocokkan dengan keterangan transaksi. <span id="fnLearnInfo"></span></p></div>
+          <div class="actions"><button class="btn sm" id="fnAddCat" type="button">Tambah kategori</button><button class="btn sm" id="fnReapply" type="button">Terapkan ulang</button><button class="btn sm ghost" id="fnLearnReset" type="button">Reset hasil belajar</button><button class="btn sm primary" id="fnSaveCats" type="button">Simpan</button></div></div>
+        <div class="tbl-wrap" style="max-height:520px;overflow:auto"><table class="symtbl"><thead><tr><th>Warna</th><th>Nama</th><th>Tipe <span class="q" tabindex="0" role="button" aria-label="Penjelasan" data-tip="Pindah dana = uang berpindah ke investasi, trading, atau rekening sendiri. Tidak dihitung sebagai pemasukan/pengeluaran.">?</span></th><th>Kata kunci</th><th></th></tr></thead><tbody id="fnCatBody"></tbody></table></div>
+      </section>
+    </div>
+  </section>
+
   <!-- ================= PENGATURAN ================= -->
   <section class="view" id="v-settings">
     <div class="help-slot" data-help="settings"></div>
@@ -499,8 +644,8 @@
 
         <!-- Akun & risiko -->
         <div class="tabpane on" id="t-acc">
-          <div class="field"><label for="aMenu">Ruang yang tersedia</label>
-            <select id="aMenu"><option value="all">Trading &amp; Investasi</option><option value="trade">Hanya Trading</option><option value="save">Hanya Investasi</option></select></div>
+          <div class="field"><label>Ruang yang tersedia</label>
+            <div class="space-checks"><label><input type="checkbox" id="aSpTrade"> Trading</label><label><input type="checkbox" id="aSpInvest"> Investasi</label><label><input type="checkbox" id="aSpFin"> Keuangan</label></div></div>
           <div class="row3">
             <div class="field"><label for="aBal">Modal / balance</label><input type="number" id="aBal" class="num" step="any"></div>
             <div class="field"><label for="aCcy">Mata uang akun</label><select id="aCcy"></select></div>
@@ -665,18 +810,35 @@
   </div>
 </div>
 
+<!-- Pratinjau import mutasi -->
+<div class="modal" id="fnImpModal" role="dialog" aria-modal="true" aria-labelledby="fnImpTitle">
+  <div class="modal-box xwide">
+    <h2 id="fnImpTitle">Periksa hasil bacaan</h2>
+    <p class="hint" id="fnImpInfo" style="margin-bottom:12px"></p>
+    <div class="row">
+      <div class="field"><label for="fnImpAcct">Masukkan ke rekening</label><select id="fnImpAcct"></select></div>
+      <div class="field" id="fnImpNewWrap"><label for="fnImpNewName">Nama rekening baru</label><input type="text" id="fnImpNewName" placeholder="mis. Mandiri Gaji"></div>
+    </div>
+    <div class="tbl-wrap" style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px">
+      <table><thead><tr><th><button class="btn sm ghost" id="fnImpAll" type="button" data-tip="Centang / hapus centang semua">✓</button></th><th>Tgl</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th></th></tr></thead><tbody id="fnImpBody"></tbody></table>
+    </div>
+    <p class="hint" style="margin-top:10px">Baris kuning = arah masuk/keluar perlu dicek (klik ⇄ untuk membalik). Baris "sudah ada" tidak dicentang agar tidak dobel.</p>
+    <div class="modal-foot"><button class="btn ghost" id="fnImpCancel" type="button">Batal</button><button class="btn primary" id="fnImpSave" type="button">Simpan transaksi</button></div>
+  </div>
+</div>
+
 <!-- Onboarding -->
 <div class="modal" id="onbModal" role="dialog" aria-modal="true" aria-labelledby="onbTitle">
   <div class="modal-box wide">
     <h2 id="onbTitle">Selamat datang di RiskDesk</h2>
     <p class="sub">Semua bisa diubah lagi di Pengaturan.</p>
-    <p class="lbl" style="margin:0 0 8px">Saya ingin memakai RiskDesk untuk</p>
-    <div class="space-cards" role="radiogroup">
-      <button type="button" class="space-card" data-omenu="trade" role="radio"><b>📈 Trading</b><span>Ukur risiko entry MT5, pantau total SL, jurnal &amp; analitik.</span></button>
-      <button type="button" class="space-card" data-omenu="save" role="radio"><b>💰 Investasi</b><span>Tabungan emas, saham, SBN, reksa dana, kripto, target &amp; setoran rutin.</span></button>
-      <button type="button" class="space-card on" data-omenu="all" role="radio"><b>✨ Keduanya</b><span>Pindah kapan saja lewat tombol Trading | Investasi.</span></button>
+    <p class="lbl" style="margin:0 0 8px">Saya ingin memakai RiskDesk untuk <span class="c-muted" style="font-weight:500">(pilih satu atau lebih)</span></p>
+    <div class="space-cards">
+      <button type="button" class="space-card on" data-ospace="trade" aria-pressed="true"><b>📈 Trading</b><span>Ukur risiko entry MT5, pantau total SL, jurnal &amp; analitik.</span></button>
+      <button type="button" class="space-card on" data-ospace="invest" aria-pressed="true"><b>💰 Investasi</b><span>Tabungan emas, saham, SBN, reksa dana, kripto, target &amp; setoran rutin.</span></button>
+      <button type="button" class="space-card on" data-ospace="fin" aria-pressed="true"><b>💳 Keuangan</b><span>Pemasukan &amp; pengeluaran, import mutasi bank, dan alokasi dana.</span></button>
     </div>
-    <input type="hidden" id="oMenu" value="all">
+    <p class="hint" style="margin:-6px 0 14px">Jika memilih lebih dari satu, pindah ruang lewat tombol di atas menu.</p>
     <div id="oTrade">
     <div class="row">
       <div class="field"><label for="oBal">Modal saat ini</label><input type="number" id="oBal" class="num" step="any" value="1000"></div>
