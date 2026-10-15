@@ -608,7 +608,7 @@
       <div class="help-slot" data-help="fn-set"></div>
       <section class="card">
         <div class="card-head"><div><h2>Rekening</h2><p class="sub">Dibuat otomatis saat import, atau tambah manual.</p></div><button class="btn sm primary" id="fnAddAcct" type="button">Tambah rekening</button></div>
-        <div class="tbl-wrap"><table><thead><tr><th>Rekening</th><th>Saldo acuan</th><th>Saldo sekarang</th><th></th></tr></thead><tbody id="fnAcctBody"></tbody></table></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Rekening</th><th>Sumber saldo</th><th>Saldo</th><th></th></tr></thead><tbody id="fnAcctBody"></tbody></table></div>
       </section>
       <section class="card" style="margin-top:20px">
         <div class="card-head"><div><h2>Kategori &amp; kata kunci</h2><p class="sub">Kata kunci (pisahkan koma) dicocokkan dengan keterangan transaksi. <span id="fnLearnInfo"></span></p></div>
@@ -778,6 +778,13 @@
             <div class="field"><label>&nbsp;</label><button class="btn" id="savePin" type="button">Ganti PIN</button></div>
           </div>
           <p class="hint">PIN hanya mengunci menu pengaturan di perangkat ini, bukan pengamanan server.</p>
+          <hr class="sep">
+          <h3>Kapasitas penyimpanan</h3>
+          <p class="hint" id="stoTxt"></p>
+          <div class="bar" style="margin:8px 0 10px"><i id="stoBar"></i></div>
+          <div id="stoList"></div>
+          <div class="actions" style="margin-top:10px"><button class="btn sm" id="stoPrune" type="button" data-tip="Hapus transaksi keuangan lama dan ringkas riwayat harga. Unduh backup dulu.">Rapikan data lama</button></div>
+          <p class="hint" style="margin-top:8px">File mutasi yang diimport tidak disimpan, hanya transaksinya. Satu transaksi ±200 byte; ±5.000 transaksi per tahun ≈ 1 MB.</p>
           <hr class="sep">
           <h3>Backup</h3>
           <div class="actions">

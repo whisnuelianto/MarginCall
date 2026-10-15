@@ -5,7 +5,7 @@
 (() => {
 "use strict";
 
-const VERSION = "2.7.0";
+const VERSION = "2.7.2";
 const KEY = "riskdesk.v2", OLD_KEY = "riskdesk.v1", AUTH_KEY = "riskdesk.auth";
 
 /* ================================================================
@@ -161,7 +161,15 @@ function normalize(d) {
       const f = d.finance || {}, arr = k => Array.isArray(f[k]) ? f[k] : [];
       const cats = arr("cats").length ? arr("cats") : b.finance.cats;
       ["in-other", "out-other"].forEach(id => { if (!cats.some(c => c.id === id)) cats.push(b.finance.cats.find(c => c.id === id)); });
-      return { accounts: arr("accounts"), tx: arr("tx"), cats, learn: f.learn && typeof f.learn === "object" ? f.learn : {}, rules: { ...DEFAULT_FIN_RULES, ...(f.rules || {}) } };
+      const accounts = arr("accounts").map(a => {
+        if (a.stmts === undefined) { // data lama: anggap saldo terakhir dari import sebagai e-statement terakhir
+          const hasImport = arr("tx").some(t => t.acct === a.id && t.src === "pdf");
+          a.stmts = hasImport && a.balanceAt ? [{ id: "m" + a.id, from: "", to: a.balanceAt, open: null, close: +a.balance || 0, n: 0, file: "(dari import sebelumnya)", at: 0 }] : [];
+          if (a.stmtOnly === undefined) a.stmtOnly = hasImport;
+        }
+        return a;
+      });
+      return { accounts, tx: arr("tx"), cats, learn: f.learn && typeof f.learn === "object" ? f.learn : {}, rules: { ...DEFAULT_FIN_RULES, ...(f.rules || {}) } };
     })(),
     last: d.last || b.last,
     updatedAt: +d.updatedAt || 0
@@ -187,6 +195,7 @@ function save(opts = {}) {
   if (!lsSet(KEY, JSON.stringify(S))) toast("Gagal menyimpan", "Penyimpanan browser penuh atau diblokir.", "danger");
   resolveCache.clear();
   if (!opts.noSync) Cloud.schedule();
+  if (typeof checkStorage === "function") checkStorage();
 }
 function showStaleBanner() {
   if (document.getElementById("staleBanner")) return;
@@ -2097,11 +2106,20 @@ function parseStatement(pages) {
   let defYear = +Object.keys(yrs).sort((a, b) => yrs[b] - yrs[a])[0] || 0;
   if (!defYear) { const m = fullText.match(/\b(20\d{2})\b/); defYear = m ? +m[1] : new Date().getFullYear(); }
 
-  let cols = null, openBal = NaN, closeBal = NaN;
+  let cols = null, openBal = NaN, closeBal = NaN, sumHdr = false;
   const blocks = []; let cur = null;
   const amtItems = r => r.items.map(it => { const a = parseAmt(it.s); return a ? { ...a, cx: it.x + (it.w || 0) / 2, rx: it.x + (it.w || 0) } : null; }).filter(Boolean);
   const markerOf = r => { const it = r.items.find(i => /^(D|K|DB|CR|DR|C)$/i.test(i.s.trim())); return it ? (/^(K|CR|C)$/i.test(it.s.trim()) ? 1 : -1) : 0; };
   all.forEach(r => {
+    const d0 = parseDateStart(r.text, defYear);
+    // Baris ringkasan: "Saldo Awal ... Saldo Akhir" (angka di baris yang sama atau baris berikutnya)
+    if (!d0 && RX_OPEN.test(r.text) && RX_CLOSE.test(r.text)) {
+      const a = amtItems(r);
+      if (a.length >= 2) { openBal = a[0].v; closeBal = a[a.length - 1].v; } else sumHdr = true;
+      cur = null; return;
+    }
+    if (sumHdr && !d0) { const a = amtItems(r); if (a.length >= 2) { openBal = a[0].v; closeBal = a[a.length - 1].v; sumHdr = false; cur = null; return; } }
+    if (d0) sumHdr = false;
     // Header kolom
     const roles = {};
     r.items.forEach(it => { const t = it.s.trim(); for (const k in HDR) if (HDR[k].test(t)) roles[k] = it.x + (it.w || 0) / 2; });
@@ -2177,7 +2195,7 @@ function finalizeTxs(txs, openBal, closeBal, bank) {
   if (!isFinite(closeBal) && lastBal) closeBal = lastBal.bal;
   return {
     bank, openBal, closeBal,
-    txs: txs.map(t => ({ date: t.date, desc: t.desc, amount: Math.round(t.dir * t.amt * 100) / 100, bal: t.bal, unsure: t.unsure })),
+    txs: txs.map(t => ({ date: t.date, desc: t.desc, amount: Math.round(t.dir * t.amt * 100) / 100, bal: isFinite(t.bal) ? t.bal : null, unsure: t.unsure })),
     from: txs[0] ? txs[0].date : "", to: txs.length ? txs[txs.length - 1].date : ""
   };
 }
@@ -2292,7 +2310,9 @@ function parseCsvRows(text) {
 const FN = () => S.finance;
 const fnCat = id => FN().cats.find(c => c.id === id) || { id, name: "Lainnya", type: "out", color: "#8A9AB5", kw: [] };
 const fnAcct = id => FN().accounts.find(a => a.id === id);
-const fnKey = d => String(d || "").toUpperCase().replace(/[0-9]+/g, " ").replace(/[^A-Z ]+/g, " ").replace(/\b(TRSF|TRF|E BANKING|EBANKING|CR|DB|DR|QRIS|PEMBAYARAN|PEMBELIAN|TRANSFER|KE|DARI|ATM|DEBIT|KREDIT)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 3).join(" ");
+const fnKeyCache = new Map();
+const fnKey = d => { const k = String(d || ""); let v = fnKeyCache.get(k); if (v === undefined) { v = fnKeyRaw(k); if (fnKeyCache.size > 20000) fnKeyCache.clear(); fnKeyCache.set(k, v); } return v; };
+const fnKeyRaw = d => String(d || "").toUpperCase().replace(/[0-9]+/g, " ").replace(/[^A-Z ]+/g, " ").replace(/\b(TRSF|TRF|E BANKING|EBANKING|CR|DB|DR|QRIS|PEMBAYARAN|PEMBELIAN|TRANSFER|KE|DARI|ATM|DEBIT|KREDIT)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 3).join(" ");
 const monthsBack = (n, from = thisYm()) => { const out = []; let [y, m] = from.split("-").map(Number); for (let i = 0; i < n; i++) { out.unshift(`${y}-${String(m).padStart(2, "0")}`); m--; if (m < 1) { m = 12; y--; } } return out; };
 const isMove = t => fnCat(t.cat).type === "move";
 
@@ -2309,19 +2329,25 @@ function autoCat(desc, amount) {
 }
 
 /* ---------- Agregasi ---------- */
-function monthAgg(ym) {
-  const r = { in: 0, out: 0, move: 0, byCat: {}, n: 0 };
+let aggCache = { key: "", map: null, months: [] };
+/** Agregasi semua bulan sekaligus (satu kali lewat data), di-cache sampai data berubah. */
+function aggAll() {
+  const key = (S.updatedAt || 0) + ":" + FN().tx.length + ":" + FN().cats.length;
+  if (aggCache.key === key) return aggCache;
+  const map = {}, typeOf = {}; FN().cats.forEach(c => typeOf[c.id] = c.type);
   FN().tx.forEach(t => {
-    if (ymOf(t.date) !== ym) return;
-    const c = fnCat(t.cat); r.n++;
-    if (c.type === "move") { r.move += t.amount; return; }
+    const ym = t.date.slice(0, 7), r = map[ym] || (map[ym] = { in: 0, out: 0, move: 0, byCat: {}, n: 0 });
+    const ty = typeOf[t.cat] || (t.amount >= 0 ? "in" : "out"); r.n++;
+    if (ty === "move") { r.move += t.amount; return; }
     if (t.amount >= 0) r.in += t.amount; else r.out += -t.amount;
-    r.byCat[c.id] = (r.byCat[c.id] || 0) + Math.abs(t.amount);
+    r.byCat[t.cat] = (r.byCat[t.cat] || 0) + Math.abs(t.amount);
   });
-  r.surplus = r.in - r.out;
-  return r;
+  Object.values(map).forEach(r => r.surplus = r.in - r.out);
+  aggCache = { key, map, months: Object.keys(map).sort() };
+  return aggCache;
 }
-function dataMonths() { return [...new Set(FN().tx.map(t => ymOf(t.date)))].sort(); }
+function monthAgg(ym) { return aggAll().map[ym] || { in: 0, out: 0, move: 0, byCat: {}, n: 0, surplus: 0 }; }
+function dataMonths() { return aggAll().months.slice(); }
 /** Bulan dasar untuk rata-rata: N bulan terakhir yang punya data, tanpa bulan berjalan bila ada bulan lengkap. */
 function baseMonths(n) {
   let ms = dataMonths(); const cur = thisYm();
@@ -2334,10 +2360,16 @@ function averages(n) {
   aggs.forEach(a => Object.entries(a.byCat).forEach(([k, v]) => byCat[k] = (byCat[k] || 0) + v / aggs.length));
   return { in: avg("in"), out: avg("out"), surplus: avg("surplus"), months: ms, byCat };
 }
+/** E-statement terakhir (berdasarkan tanggal akhir periode) untuk rekening ini. */
+const lastStmt = a => (a.stmts || []).filter(x => isFinite(x.close)).sort((x, y) => x.to.localeCompare(y.to) || (x.at || 0) - (y.at || 0)).pop() || null;
+/** Saldo rekening. Mode e-statement: persis saldo akhir e-statement terakhir. Mode campuran: saldo acuan + transaksi setelahnya. */
 function acctBalance(a) {
+  const st = lastStmt(a);
+  if (a.stmtOnly !== false && st) return st.close;
   const base = +a.balance || 0, at = a.balanceAt || "0000";
   return base + FN().tx.filter(t => t.acct === a.id && t.date > at).reduce((s, t) => s + t.amount, 0);
 }
+const acctAsOf = a => { const st = lastStmt(a); return a.stmtOnly !== false && st ? st.to : a.balanceAt; };
 const totalBank = () => FN().accounts.reduce((s, a) => s + acctBalance(a), 0);
 function tradeIDR() {
   if (!enabledSpaces().includes("trade")) return 0;
@@ -2407,7 +2439,9 @@ function fnRenderSum() {
       <div class="rebal-bar"><i style="width:${v / cats[0][1] * 100}%;background:${c.color}"></i></div>
       ${isFinite(ch) && Math.abs(ch) >= 15 ? `<small class="${ch > 0 ? "c-warn" : "c-buy"}">${ch > 0 ? "▲" : "▼"} ${fmt(Math.abs(ch), 0)}% dibanding rata-rata (${rp(avg)})</small>` : ""}</div>`;
   }).join("") : `<p class="empty">Belum ada pengeluaran bulan ini.</p>`;
-  $("fnAccts").innerHTML = FN().accounts.length ? FN().accounts.map(a => `<div class="expo-row"><b>${esc(a.name)}</b><span class="c-muted">${a.balanceAt ? "per " + new Date(a.balanceAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : ""}</span><span class="num">${rp(acctBalance(a))}</span></div>`).join("")
+  $("fnAccts").innerHTML = FN().accounts.length ? FN().accounts.map(a => { const at = acctAsOf(a), st = lastStmt(a), byStmt = a.stmtOnly !== false && st;
+    return `<div class="expo-row"><b>${esc(a.name)}</b><span class="c-muted">${at ? "per " + new Date(at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : ""}${byStmt ? " · e-statement" : ""}</span><span class="num">${rp(acctBalance(a))}</span></div>`; }).join("")
+    + `<p class="hint" style="margin-top:8px">Saldo e-statement adalah saldo pada <b>tanggal akhir periode</b> e-statement. Transaksi setelah tanggal itu belum termasuk, sehingga bisa berbeda dengan saldo di aplikasi bank hari ini.</p>`
     : `<p class="empty">Rekening dibuat otomatis saat import mutasi, atau tambahkan di <b>Kategori & rekening</b>.</p>`;
 }
 
@@ -2416,6 +2450,7 @@ function fnCatOptions(cur, type) {
   const groups = { in: "Pemasukan", out: "Pengeluaran", move: "Pindah dana" };
   return Object.entries(groups).map(([t, g]) => `<optgroup label="${g}">` + FN().cats.filter(c => c.type === t && (!type || type === t || t === "move")).map(c => `<option value="${c.id}" ${c.id === cur ? "selected" : ""}>${esc(c.name)}</option>`).join("") + `</optgroup>`).join("");
 }
+let fnTxLimit = 300;
 function fnRenderTx() {
   const fm = $("fnFMonth").value, fa = $("fnFAcct").value, fc = $("fnFCat").value, q = $("fnFSearch").value.trim().toUpperCase();
   $("fnFMonth").innerHTML = `<option value="">Semua bulan</option>` + dataMonths().reverse().map(m => `<option value="${m}" ${m === fm ? "selected" : ""}>${ymLabel(m)}</option>`).join("");
@@ -2425,18 +2460,22 @@ function fnRenderTx() {
     .sort((a, b) => b.date.localeCompare(a.date) || (b.t || "").localeCompare(a.t || ""));
   const sIn = list.filter(t => !isMove(t) && t.amount > 0).reduce((s, t) => s + t.amount, 0), sOut = list.filter(t => !isMove(t) && t.amount < 0).reduce((s, t) => s - t.amount, 0);
   $("fnTxSum").innerHTML = list.length ? `${list.length} transaksi · masuk <b class="num c-buy">${rp(sIn)}</b> · keluar <b class="num c-sell">${rp(sOut)}</b>` : "";
-  $("fnTxBody").innerHTML = list.length ? list.slice(0, 800).map(t => {
-    const a = fnAcct(t.acct);
+  const optsAll = fnCatOptions(""), acctName = {}; FN().accounts.forEach(a => acctName[a.id] = a.name);
+  const more = list.length > fnTxLimit;
+  $("fnTxBody").innerHTML = list.length ? list.slice(0, fnTxLimit).map(t => {
+    const a = acctName[t.acct] ? { name: acctName[t.acct] } : null;
     return `<tr class="${t.unsure ? "row-pend" : ""}"><td class="c-muted">${new Date(t.date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" })}</td>
       <td class="wrap">${esc(t.desc)}${t.unsure ? ' <span class="pill med" data-tip="Arah masuk/keluar tidak bisa dipastikan dari PDF. Cek dan klik ⇄ jika terbalik.">cek</span>' : ""}</td>
       <td class="c-muted">${a ? esc(a.name) : "Tunai"}</td>
-      <td><select class="fn-cat" data-id="${t.id}" aria-label="Kategori">${fnCatOptions(t.cat)}</select></td>
+      <td><select class="fn-cat" data-id="${t.id}" aria-label="Kategori">${optsAll.replace(`value="${t.cat}"`, `value="${t.cat}" selected`)}</select></td>
       <td class="num ${isMove(t) ? "c-muted" : t.amount >= 0 ? "c-buy" : "c-sell"}" style="text-align:right">${rpS(t.amount)}</td>
       <td><div class="actions"><button class="btn sm ghost" data-fnx="flip" data-id="${t.id}" data-tip="Balik arah: masuk ↔ keluar">⇄</button><button class="btn sm ghost" data-fnx="edit" data-id="${t.id}">Ubah</button><button class="btn sm ghost" data-fnx="del" data-id="${t.id}" aria-label="Hapus">✕</button></div></td></tr>`;
-  }).join("") : `<tr><td colspan="6" class="empty">${FN().tx.length ? "Tidak ada transaksi yang cocok." : "Belum ada transaksi. Klik Import mutasi atau Catat manual."}</td></tr>`;
+  }).join("") + (more ? `<tr><td colspan="6" style="text-align:center"><button class="btn sm" type="button" id="fnMore">Tampilkan ${Math.min(300, list.length - fnTxLimit)} lagi (dari ${list.length - fnTxLimit} sisanya)</button></td></tr>` : "")
+    : `<tr><td colspan="6" class="empty">${FN().tx.length ? "Tidak ada transaksi yang cocok." : "Belum ada transaksi. Klik Import mutasi atau Catat manual."}</td></tr>`;
+  if (more) $("fnMore").onclick = () => { fnTxLimit += 300; fnRenderTx(); };
 }
-["fnFMonth", "fnFAcct", "fnFCat"].forEach(id => $(id).addEventListener("change", fnRenderTx));
-$("fnFSearch").addEventListener("input", fnRenderTx);
+["fnFMonth", "fnFAcct", "fnFCat"].forEach(id => $(id).addEventListener("change", () => { fnTxLimit = 300; fnRenderTx(); }));
+let fnSearchT; $("fnFSearch").addEventListener("input", () => { clearTimeout(fnSearchT); fnSearchT = setTimeout(() => { fnTxLimit = 300; fnRenderTx(); }, 200); });
 $("fnTxBody").addEventListener("change", e => {
   const s = e.target.closest(".fn-cat"); if (!s) return;
   const t = FN().tx.find(x => x.id === s.dataset.id); if (!t) return;
@@ -2456,7 +2495,7 @@ $("fnTxBody").addEventListener("click", async e => {
   if (b.dataset.fnx === "del" && await confirmBox("Hapus transaksi?", t.desc, "Hapus")) { FN().tx = FN().tx.filter(x => x !== t); save(); fnRenderTx(); }
 });
 async function fnTxForm(edit, preset = {}) {
-  const t0 = { kind: "out", date: todayStr(), amount: "", acct: FN().accounts[0] ? FN().accounts[0].id : "", cat: "", desc: "", ...(edit ? { kind: isMove(edit) ? "move" : edit.amount >= 0 ? "in" : "out", date: edit.date, amount: Math.abs(edit.amount), acct: edit.acct || "", cat: edit.cat, desc: edit.desc } : {}), ...preset };
+  const t0 = { kind: "out", date: todayStr(), amount: "", acct: "", cat: "", desc: "", ...(edit ? { kind: isMove(edit) ? "move" : edit.amount >= 0 ? "in" : "out", date: edit.date, amount: Math.abs(edit.amount), acct: edit.acct || "", cat: edit.cat, desc: edit.desc } : {}), ...preset };
   const pr = ask({ title: edit ? "Ubah transaksi" : "Catat transaksi", ok: "Simpan", body: `
     <div class="seg3" id="fkKind" role="group" style="margin-bottom:14px">${[["out", "Pengeluaran"], ["in", "Pemasukan"], ["move", "Pindah dana"]].map(([k, l]) => `<button type="button" data-k="${k}" class="${k === t0.kind ? "on" : ""}">${l}</button>`).join("")}</div>
     <input type="hidden" name="kind" id="fkKindV" value="${t0.kind}">
@@ -2465,7 +2504,8 @@ async function fnTxForm(edit, preset = {}) {
     <div class="field"><label>Keterangan</label><input name="desc" id="fkDesc" type="text" value="${esc(t0.desc)}" placeholder="mis. Makan siang, Gaji Oktober"></div>
     <div class="row"><div class="field"><label>Kategori</label><select name="cat" id="fkCat"></select></div>
     <div class="field"><label>Rekening</label><select name="acct"><option value="">Tunai / tanpa rekening</option>${FN().accounts.map(a => `<option value="${a.id}" ${a.id === t0.acct ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div></div>
-    <p class="hint" id="fkHint"></p>` });
+    <p class="hint" id="fkHint"></p>
+    <p class="hint" style="margin-top:4px">Saldo rekening yang mengikuti e-statement tidak berubah karena transaksi manual. Transaksi tetap dihitung di pemasukan/pengeluaran.</p>` });
   const hints = { out: "Uang keluar untuk kebutuhan/konsumsi.", in: "Uang masuk: gaji, bonus, usaha, bunga, dan lainnya.", move: "Pindah dana ke investasi, trading, atau rekening sendiri. Tidak dihitung sebagai pengeluaran." };
   const fillCats = () => { const k = $("fkKindV").value, cur = $("fkCat").value || t0.cat;
     $("fkCat").innerHTML = FN().cats.filter(c => c.type === k).map(c => `<option value="${c.id}" ${c.id === cur ? "selected" : ""}>${esc(c.name)}</option>`).join("");
@@ -2550,6 +2590,7 @@ $("fnImportFile").addEventListener("change", async e => {
   for (const f of files) await fnImportOne(f);
 });
 async function fnImportOne(f) {
+  if (f.size > 30 * 1024 * 1024 && !(await confirmBox("File cukup besar", `${f.name} berukuran ${(f.size / 1024 / 1024).toFixed(0)} MB. Membaca bisa lambat, terutama di HP. Lanjutkan?`, "Lanjutkan", false))) return;
   toast("Membaca mutasi", f.name);
   let buf; try { buf = await f.arrayBuffer(); } catch (err) { toast("File tidak bisa dibaca", f.name, "danger"); return; }
   if (/\.(xlsx|xls|xlsm|csv|txt)$/i.test(f.name)) {
@@ -2595,10 +2636,15 @@ function fnPreview(res, fname) {
   const keyOf = (acct, t) => `${acct}|${t.date}|${Math.round(t.amount)}|${fnKey(t.desc)}`;
   const bankName = res.bank || "";
   let match = FN().accounts.find(a => bankName && (a.bank === bankName || a.name.toLowerCase().includes(bankName.toLowerCase())));
+  if (!match && FN().accounts.length) { // saldo bersambung: saldo awal = saldo akhir e-statement sebelumnya (atau sebaliknya)
+    const first = res.txs[0], open = isFinite(res.openBal) ? res.openBal : (first && isFinite(first.bal) ? first.bal - first.amount : NaN);
+    match = FN().accounts.find(a => (a.stmts || []).some(x => (isFinite(open) && x.close != null && Math.abs(x.close - open) < 1) || (isFinite(res.closeBal) && x.open != null && Math.abs(x.open - res.closeBal) < 1)));
+  }
   if (!match && !bankName && FN().accounts.length) { // bank tidak terdeteksi: pilih rekening yang paling banyak cocok dengan transaksi lama
     let best = 0;
     FN().accounts.forEach(a => { const keys = new Set(FN().tx.filter(t => t.acct === a.id).map(t => keyOf(a.id, t))); const n = res.txs.filter(t => keys.has(keyOf(a.id, t))).length; if (n > best) { best = n; match = a; } });
   }
+  if (!match && !bankName && FN().lastAcct) match = fnAcct(FN().lastAcct); // terakhir dipakai
   fnPrev = { res, rows: res.txs.map(t => ({ ...t, cat: autoCat(t.desc, t.amount), on: true })), acct: match ? match.id : "new", fname };
   const markDup = () => { const keys = new Set(FN().tx.map(t => keyOf(t.acct, t))); fnPrev.rows.forEach(r => { r.dup = fnPrev.acct !== "new" && keys.has(keyOf(fnPrev.acct, r)); r.on = !r.dup; }); };
   markDup();
@@ -2611,8 +2657,17 @@ function fnPreview(res, fname) {
   const draw = () => {
     const sel = fnPrev.rows.filter(r => r.on), sIn = sel.filter(r => r.amount > 0).reduce((s, r) => s + r.amount, 0), sOut = sel.filter(r => r.amount < 0).reduce((s, r) => s - r.amount, 0);
     const uns = fnPrev.rows.filter(r => r.unsure).length, dups = fnPrev.rows.filter(r => r.dup).length;
+    // Pencocokan: saldo awal + semua transaksi terbaca harus sama dengan saldo akhir
+    let rec = "";
+    const all = fnPrev.rows.reduce((s, r) => s + r.amount, 0);
+    const first = fnPrev.rows[0], open = isFinite(res.openBal) ? res.openBal : (first && isFinite(first.bal) ? first.bal - first.amount : NaN);
+    if (isFinite(open) && isFinite(res.closeBal)) {
+      const diff = Math.round((open + all - res.closeBal) * 100) / 100;
+      rec = Math.abs(diff) < 1 ? `<br><span class="c-buy">✓ Cocok: saldo awal ${rp(open)} + mutasi ${rpS(all)} = saldo akhir ${rp(res.closeBal)}</span>`
+        : `<br><span class="c-sell">⚠ Tidak cocok, selisih ${rpS(-diff)}. Kemungkinan ada transaksi yang terlewat atau arahnya terbalik (cek baris kuning / klik ⇄). Saldo rekening tetap memakai saldo akhir e-statement.</span>`;
+    }
     $("fnImpInfo").innerHTML = `${bankName ? `Bank terdeteksi: <b>${esc(bankName)}</b> · ` : ""}Periode <b>${res.from ? new Date(res.from).toLocaleDateString("id-ID") : "?"}</b> – <b>${res.to ? new Date(res.to).toLocaleDateString("id-ID") : "?"}</b> · ${fnPrev.rows.length} transaksi${isFinite(res.closeBal) ? ` · saldo akhir <b class="num">${rp(res.closeBal)}</b>` : ""}
-      <br>Dipilih ${sel.length}: masuk <b class="num c-buy">${rp(sIn)}</b>, keluar <b class="num c-sell">${rp(sOut)}</b>${uns ? ` · <span class="c-warn">${uns} baris perlu dicek arahnya</span>` : ""}${dups ? ` · <span class="c-muted">${dups} sudah pernah diimport (tidak dicentang)</span>` : ""}`;
+      <br>Dipilih ${sel.length}: masuk <b class="num c-buy">${rp(sIn)}</b>, keluar <b class="num c-sell">${rp(sOut)}</b>${uns ? ` · <span class="c-warn">${uns} baris perlu dicek arahnya</span>` : ""}${dups ? ` · <span class="c-muted">${dups} sudah pernah diimport (tidak dicentang)</span>` : ""}${rec}`;
     $("fnImpBody").innerHTML = fnPrev.rows.map((r, i) => `<tr class="${r.unsure ? "row-pend" : ""}${r.dup ? " row-dup" : ""}">
       <td><input type="checkbox" data-i="${i}" data-imp="on" ${r.on ? "checked" : ""} aria-label="Sertakan"></td>
       <td class="c-muted num">${r.date.slice(8, 10)}/${r.date.slice(5, 7)}</td>
@@ -2639,13 +2694,20 @@ $("fnImpSave").onclick = () => {
   let acctId = fnPrev.acct;
   if (acctId === "new") {
     const name = $("fnImpNewName").value.trim() || fnPrev.res.bank || "Rekening";
-    const a = { id: uid(), name, bank: fnPrev.res.bank || "", balance: 0, balanceAt: "" };
+    const a = { id: uid(), name, bank: fnPrev.res.bank || "", balance: 0, balanceAt: "", stmtOnly: true, stmts: [] };
     FN().accounts.push(a); acctId = a.id;
   }
   const sel = fnPrev.rows.filter(r => r.on);
-  sel.forEach(r => FN().tx.push({ id: uid(), t: Date.now().toString(36), acct: acctId, date: r.date, desc: r.desc, amount: r.amount, cat: r.cat, src: "pdf", unsure: false }));
+  sel.forEach(r => FN().tx.push({ id: uid(), t: Date.now().toString(36), acct: acctId, date: r.date, desc: r.desc, amount: r.amount, cat: r.cat, src: "pdf", bal: r.bal ?? null, unsure: false }));
   const a = fnAcct(acctId), res = fnPrev.res;
-  if (a && isFinite(res.closeBal) && res.to && (!a.balanceAt || res.to >= a.balanceAt)) { a.balance = res.closeBal; a.balanceAt = res.to; }
+  FN().lastAcct = acctId;
+  if (a) {
+    a.stmts = (a.stmts || []).filter(x => !(x.from === res.from && x.to === res.to)); // impor ulang periode sama: ganti
+    const first = fnPrev.rows[0], open = isFinite(res.openBal) ? res.openBal : (first && isFinite(first.bal) ? first.bal - first.amount : null);
+    a.stmts.push({ id: uid(), from: res.from, to: res.to, open, close: isFinite(res.closeBal) ? res.closeBal : null, n: fnPrev.rows.length, file: fnPrev.fname, at: Date.now() });
+    if (a.stmtOnly === undefined) a.stmtOnly = true;
+    if (isFinite(res.closeBal) && res.to && (!a.balanceAt || res.to >= a.balanceAt)) { a.balance = res.closeBal; a.balanceAt = res.to; }
+  }
   save(); $("fnImpModal").classList.remove("open"); fnPrev = null; renderFinance();
   toast("Mutasi diimport", `${sel.length} transaksi masuk ke ${a ? a.name : "rekening"}.`, "ok");
 };
@@ -2666,7 +2728,8 @@ function fnRenderPat() {
     + `<p class="hint" style="margin-top:8px">Total rutin keluar ±${rp(rec.filter(r => r.dir < 0).reduce((s, r) => s + r.amount, 0))}/bulan.</p>` : `<p class="empty">Transaksi rutin terdeteksi setelah ada data minimal 3 bulan.</p>`;
   // Hari & tanggal
   const wd = [0, 0, 0, 0, 0, 0, 0], part = [0, 0, 0];
-  const out = FN().tx.filter(t => t.amount < 0 && !isMove(t) && baseMonths(6).concat(thisYm()).includes(ymOf(t.date)));
+  const recentMs = new Set(baseMonths(6).concat(thisYm()));
+  const out = FN().tx.filter(t => t.amount < 0 && recentMs.has(t.date.slice(0, 7)) && !isMove(t));
   out.forEach(t => { const d = new Date(t.date + "T12:00:00"); wd[(d.getDay() + 6) % 7] += -t.amount; const dd = d.getDate(); part[dd <= 10 ? 0 : dd <= 20 ? 1 : 2] += -t.amount; });
   if (out.length) { bars("fnWd", ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"], wd, null, { aColor: "var(--sell)", aName: "Keluar" }); bars("fnPart", ["Tgl 1–10", "Tgl 11–20", "Tgl 21–31"], part, null, { aColor: "var(--warn)", aName: "Keluar" }); }
   else { $("fnWd").innerHTML = `<p class="empty">Belum ada data.</p>`; $("fnPart").innerHTML = ""; }
@@ -2751,10 +2814,11 @@ $$("[data-preset]").forEach(b => b.onclick = () => { Object.assign(FN().rules, F
 
 /* ---------- Kategori & rekening ---------- */
 function fnRenderSet() {
-  $("fnAcctBody").innerHTML = FN().accounts.length ? FN().accounts.map(a => `<tr><td><b>${esc(a.name)}</b><br><small class="c-muted">${esc(a.bank || "")}</small></td>
-    <td class="num">${rp(+a.balance || 0)}<br><small class="c-muted">${a.balanceAt ? "per " + new Date(a.balanceAt).toLocaleDateString("id-ID") : "belum diatur"}</small></td>
-    <td class="num"><b>${rp(acctBalance(a))}</b></td>
-    <td><div class="actions"><button class="btn sm" data-fna="edit" data-id="${a.id}">Ubah</button><button class="btn sm ghost" data-fna="del" data-id="${a.id}" aria-label="Hapus">✕</button></div></td></tr>`).join("")
+  $("fnAcctBody").innerHTML = FN().accounts.length ? FN().accounts.map(a => { const st = lastStmt(a), byStmt = a.stmtOnly !== false && st, at = acctAsOf(a);
+    return `<tr><td><b>${esc(a.name)}</b><br><small class="c-muted">${esc(a.bank || "")}</small></td>
+    <td>${byStmt ? `<span class="pill buy">E-statement</span>` : `<span class="pill neu">Saldo acuan + transaksi</span>`}<br><small class="c-muted">${(a.stmts || []).length} e-statement</small></td>
+    <td class="num"><b>${rp(acctBalance(a))}</b><br><small class="c-muted">${at ? "per " + new Date(at).toLocaleDateString("id-ID") : "belum diatur"}</small></td>
+    <td><div class="actions">${(a.stmts || []).length ? `<button class="btn sm" data-fna="stmts" data-id="${a.id}">Riwayat</button>` : ""}<button class="btn sm" data-fna="edit" data-id="${a.id}">Ubah</button><button class="btn sm ghost" data-fna="del" data-id="${a.id}" aria-label="Hapus">✕</button></div></td></tr>`; }).join("")
     : `<tr><td colspan="4" class="empty">Belum ada rekening.</td></tr>`;
   $("fnCatBody").innerHTML = FN().cats.map((c, i) => `<tr data-i="${i}">
     <td><input type="color" data-k="color" value="${c.color}" aria-label="Warna"></td>
@@ -2767,18 +2831,36 @@ function fnRenderSet() {
 $("fnAcctBody").addEventListener("click", async e => {
   const b = e.target.closest("[data-fna]"); if (!b) return; const a = fnAcct(b.dataset.id); if (!a) return;
   if (b.dataset.fna === "edit") return fnAcctForm(a);
+  if (b.dataset.fna === "stmts") return fnStmtHistory(a);
   const n = FN().tx.filter(t => t.acct === a.id).length;
   if (await confirmBox(`Hapus rekening ${a.name}?`, `${n} transaksinya ikut dihapus.`, "Hapus")) { FN().accounts = FN().accounts.filter(x => x !== a); FN().tx = FN().tx.filter(t => t.acct !== a.id); save(); renderFinance(); }
 });
+async function fnStmtHistory(a) {
+  const list = [...(a.stmts || [])].sort((x, y) => y.to.localeCompare(x.to));
+  const d = x => x ? new Date(x).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "?";
+  const rows = list.map(x => {
+    const sum = FN().tx.filter(t => t.acct === a.id && t.date >= x.from && t.date <= x.to && t.src !== "manual").reduce((s, t) => s + t.amount, 0);
+    const ok = x.open != null && x.close != null ? Math.abs(x.open + sum - x.close) < 1 : null;
+    return `<tr><td>${d(x.from)} – ${d(x.to)}<br><small class="c-muted">${esc(x.file || "")}</small></td><td class="num">${x.open != null ? rp(x.open) : "—"}</td><td class="num"><b>${x.close != null ? rp(x.close) : "—"}</b></td>
+      <td>${ok === null ? '<span class="pill neu">—</span>' : ok ? '<span class="pill buy">Cocok</span>' : `<span class="pill high" data-tip="Saldo awal + transaksi tersimpan ≠ saldo akhir. Bisa karena ada transaksi tidak dicentang/terlewat saat import.">Selisih ${rp(Math.abs(x.open + sum - x.close))}</span>`}</td>
+      <td><button class="btn sm ghost" data-stdel="${x.id}" type="button" aria-label="Hapus catatan e-statement">✕</button></td></tr>`;
+  }).join("");
+  const pr = ask({ title: `Riwayat e-statement · ${a.name}`, ok: "Tutup", body: `<p class="hint" style="margin-bottom:10px">Saldo rekening = saldo akhir e-statement dengan tanggal akhir paling baru. "Cocok" berarti saldo awal + transaksi tersimpan = saldo akhir.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Periode</th><th>Saldo awal</th><th>Saldo akhir</th><th>Cek</th><th></th></tr></thead><tbody id="stBody">${rows}</tbody></table></div>` });
+  $("askCancel").hidden = true;
+  $("stBody").onclick = async e => { const b = e.target.closest("[data-stdel]"); if (!b) return; a.stmts = a.stmts.filter(x => x.id !== b.dataset.stdel); save(); b.closest("tr").remove(); renderFinance(); };
+  await pr; $("askCancel").hidden = false;
+}
 async function fnAcctForm(a) {
   const v = await ask({ title: a ? `Ubah ${a.name}` : "Tambah rekening", ok: "Simpan", body: `
     <div class="row"><div class="field"><label>Nama rekening</label><input name="name" type="text" value="${esc(a ? a.name : "")}" placeholder="mis. Mandiri Gaji, Jago Utama"></div>
     <div class="field"><label>Bank</label><input name="bank" type="text" value="${esc(a ? a.bank || "" : "")}"></div></div>
-    <div class="row"><div class="field"><label>Saldo (Rp)</label><input name="balance" type="number" step="any" class="num" value="${a ? a.balance || "" : ""}"></div>
-    <div class="field"><label>Per tanggal</label><input name="at" type="date" value="${a && a.balanceAt ? a.balanceAt : todayStr()}"></div></div>
-    <p class="hint">Saldo per tanggal tertentu. Transaksi setelah tanggal itu akan menambah/mengurangi saldo otomatis. Import mutasi juga memperbarui saldo ini.</p>` });
+    <label class="switch"><span>Saldo mengikuti e-statement saja<small>Saldo = saldo akhir e-statement terakhir yang diimport. Transaksi manual tidak mengubah saldo.</small></span><input type="checkbox" name="stmtOnly" ${!a || a.stmtOnly !== false ? "checked" : ""}></label>
+    <p class="hint" style="margin:10px 0 6px">Jika dimatikan (atau belum ada e-statement), saldo dihitung dari saldo acuan berikut + semua transaksi setelah tanggalnya:</p>
+    <div class="row"><div class="field"><label>Saldo acuan (Rp)</label><input name="balance" type="number" step="any" class="num" value="${a ? a.balance || "" : ""}"></div>
+    <div class="field"><label>Per tanggal</label><input name="at" type="date" value="${a && a.balanceAt ? a.balanceAt : todayStr()}"></div></div>` });
   if (!v) return; if (!v.name.trim()) { toast("Nama wajib diisi", "", "danger"); return; }
-  const obj = a || { id: uid() }; Object.assign(obj, { name: v.name.trim(), bank: v.bank.trim(), balance: num(v.balance) || 0, balanceAt: v.at });
+  const obj = a || { id: uid(), stmts: [] }; Object.assign(obj, { name: v.name.trim(), bank: v.bank.trim(), balance: num(v.balance) || 0, balanceAt: v.at, stmtOnly: !!v.stmtOnly });
   if (!a) FN().accounts.push(obj); save(); renderFinance();
 }
 $("fnAddAcct").onclick = () => fnAcctForm(null);
@@ -2952,7 +3034,7 @@ function fillSettings() {
     ? "Masuk atau daftar dengan email untuk menyinkronkan data di semua perangkat. Setiap orang memakai akunnya sendiri, dan posisi MT5 bisa masuk otomatis."
     : "Opsional. Dengan akun cloud, data tersinkron di semua perangkat Anda, setiap orang punya akun sendiri, dan posisi MT5 bisa masuk otomatis.";
   chk("aLiveMeter", st.liveInMeter); chk("aFollowBal", st.followMt5Bal); chk("aPendMeter", st.pendInMeter !== false);
-  renderSymAdmin(); Cloud.render();
+  renderSymAdmin(); Cloud.render(); renderStorage();
 }
 $("saveAcc").onclick = () => {
   const g = id => num($(id).value);
@@ -3044,6 +3126,40 @@ $("savePin").onclick = () => {
   if (!/^\d{4,8}$/.test(v)) { toast("PIN tidak valid", "Gunakan 4–8 angka.", "danger"); return; }
   S.settings.pin = hash(v); save(); $("newPin").value = ""; toast("PIN diganti", "Gunakan PIN baru saat membuka pengaturan.", "ok");
 };
+/* ---------- Kapasitas penyimpanan ---------- */
+const LS_CAP = 5 * 1024 * 1024; // perkiraan batas penyimpanan browser per situs
+function storageInfo() {
+  const used = (lsGet(KEY) || "").length;
+  const sv = S.savings || {}, fn = S.finance || {};
+  return { used, pct: used / LS_CAP * 100, counts: [
+    ["Transaksi keuangan", (fn.tx || []).length], ["Jurnal trading", S.history.length], ["Transaksi tabungan", (sv.tx || []).length],
+    ["Riwayat harga aset", (sv.assets || []).reduce((s, a) => s + (a.prices || []).length, 0)], ["Posisi & berita", S.positions.length + S.news.length]] };
+}
+function renderStorage() {
+  const i = storageInfo(), mb = v => (v / 1024 / 1024).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+  $("stoTxt").innerHTML = `<b class="num">${mb(i.used)} MB</b> dari ±5 MB (${pct(i.pct, 1)}). Perkiraan sisa: ±${Math.max(0, Math.round((LS_CAP - i.used) / 200)).toLocaleString("id-ID")} transaksi lagi.`;
+  $("stoBar").style.width = clamp(i.pct, 0, 100) + "%";
+  $("stoBar").style.background = i.pct >= 80 ? "var(--sell)" : i.pct >= 60 ? "var(--warn)" : "var(--buy)";
+  $("stoList").innerHTML = i.counts.map(([k, n]) => `<div class="expo-row"><span>${k}</span><span></span><b class="num">${n.toLocaleString("id-ID")}</b></div>`).join("");
+}
+let stoWarned = false;
+function checkStorage() {
+  if (stoWarned) return; const i = storageInfo();
+  if (i.pct >= 80) { stoWarned = true; toast("Penyimpanan hampir penuh", `Data sudah ${pct(i.pct, 0)} dari kapasitas browser. Unduh backup, lalu hapus data lama di Pengaturan → Data & keamanan.`, "warn"); }
+}
+$("stoPrune").onclick = async () => {
+  const v = await ask({ title: "Rapikan data lama", ok: "Hapus", danger: true, body: `<p class="hint" style="margin-bottom:10px">Unduh backup dulu agar data lama tetap tersimpan di file. Yang dihapus hanya dari perangkat ini dan cloud.</p>
+    <div class="field"><label>Hapus transaksi keuangan sebelum tanggal</label><input type="date" name="before"></div>
+    <label class="switch"><span>Ringkas riwayat harga aset (sisakan 1 titik per minggu untuk data &gt; 1 tahun)</span><input type="checkbox" name="thin" checked></label>` });
+  if (!v) return;
+  let n = 0;
+  if (v.before) { const b = S.finance.tx.length; S.finance.tx = S.finance.tx.filter(t => t.date >= v.before); n += b - S.finance.tx.length; }
+  if (v.thin) { const lim = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+    (S.savings.assets || []).forEach(a => { if (!a.prices) return; const seen = new Set(), b = a.prices.length;
+      a.prices = a.prices.filter(x => { if (x.d >= lim) return true; const d = new Date(x.d), wk = d.getFullYear() + "-" + Math.floor((d - new Date(d.getFullYear(), 0, 1)) / 6048e5); if (seen.has(wk)) return false; seen.add(wk); return true; });
+      n += b - a.prices.length; }); }
+  save(); renderStorage(); toast("Data dirapikan", `${n} entri lama dihapus.`, "ok");
+};
 $("backup").onclick = () => download(`riskdesk-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "RiskDesk", version: VERSION, ...exportData() }, null, 2), "application/json");
 $("restore").addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
@@ -3124,30 +3240,39 @@ const Cloud = {
   },
   signOut(silent) { this.setSess(null); this.token = ""; this.status = "local"; Live.reset(); this.chip(); this.render(); if (!silent) toast("Keluar dari akun cloud", "Data tetap tersimpan di perangkat ini.", "ok"); },
   /** Menyamakan data lokal dan cloud. interactive=true: tanya pengguna bila cloud lebih baru. */
-  async afterLogin(interactive) {
+  /** Hanya ambil waktu pembaruan di cloud (kecil, hemat kuota). */
+  async remoteStamp() {
+    const rows = await this.req(`/rest/v1/riskdesk_data?select=updated_at&user_id=eq.${this.sess.user.id}`);
+    return rows && rows[0] ? new Date(rows[0].updated_at).getTime() : 0;
+  },
+  /** Ambil seluruh data dari cloud (hanya bila memang lebih baru). */
+  async remoteData() {
     const rows = await this.req(`/rest/v1/riskdesk_data?select=data,updated_at&user_id=eq.${this.sess.user.id}`);
-    const remote = rows && rows[0], rt = remote ? new Date(remote.updated_at).getTime() : 0;
+    return rows && rows[0] ? { data: rows[0].data, rt: new Date(rows[0].updated_at).getTime() } : null;
+  },
+  async afterLogin(interactive) {
+    const stamp = await this.remoteStamp();
+    const remote = stamp ? { updated_at: stamp } : null, rt = stamp;
     this.base = Math.max(rt, this.base || 0);
     if (remote && rt > (S.updatedAt || 0) + 1000) {
       let use = true;
       if (interactive && S.updatedAt) use = await confirmBox("Data cloud ditemukan", `Data cloud terakhir diperbarui ${new Date(rt).toLocaleString("id-ID")}. Muat data cloud ke perangkat ini? Pilih Batal untuk menimpa cloud dengan data perangkat ini.`, "Muat data cloud", false);
-      if (use) { if (applyData(remote.data, rt, S.settings.sb) && interactive) toast("Data dimuat dari cloud", "Perangkat ini sekarang sama dengan cloud.", "ok"); }
+      if (use) { const r = await this.remoteData(); if (r && applyData(r.data, r.rt, S.settings.sb) && interactive) toast("Data dimuat dari cloud", "Perangkat ini sekarang sama dengan cloud.", "ok"); }
       else await this.push();
     } else if (!remote || (S.updatedAt || 0) > rt + 1000) await this.push();
     this.status = "ok"; this.lastSync = Date.now(); this.chip();
     await this.ensureToken().catch(e => console.warn(e));
     this.render(); Live.start();
   },
-  schedule() { if (!this.sess || !this.cfg()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.push().catch(e => this.fail(e)), 1500); },
+  schedule() { if (!this.sess || !this.cfg()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.push().catch(e => this.fail(e)), 4000); },
   async push() {
     if (!this.sess) return;
     this.status = "syncing"; this.chip();
     if (readOnly) { this.status = "ok"; this.chip(); return; }
     // Jangan pernah menimpa data cloud yang lebih baru dengan data lama
-    const rows = await this.req(`/rest/v1/riskdesk_data?select=data,updated_at&user_id=eq.${this.sess.user.id}`);
-    const remote = rows && rows[0], rt = remote ? new Date(remote.updated_at).getTime() : 0;
-    if (remote && rt > (S.updatedAt || 0) + 500) {
-      applyData(remote.data, rt, S.settings.sb);
+    const rt = await this.remoteStamp();
+    if (rt && rt > (S.updatedAt || 0) + 500) {
+      const r = await this.remoteData(); if (r) applyData(r.data, r.rt, S.settings.sb);
       this.base = rt; this.status = "ok"; this.lastSync = Date.now(); this.chip(); this.render();
       toast("Data diperbarui dari perangkat lain", "Ada perubahan yang lebih baru di perangkat lain. Ulangi perubahan terakhir jika belum tersimpan.", "warn");
       return;
