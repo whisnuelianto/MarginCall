@@ -5,7 +5,7 @@
 (() => {
 "use strict";
 
-const VERSION = "2.8.0";
+const VERSION = "2.8.1";
 const KEY = "riskdesk.v2", OLD_KEY = "riskdesk.v1", AUTH_KEY = "riskdesk.auth";
 
 /* ================================================================
@@ -3824,7 +3824,13 @@ const Cloud = {
     if (prefer) h.Prefer = prefer;
     const res = await fetch(c.url + path, { method, headers: h, body: body !== undefined ? JSON.stringify(body) : undefined });
     const txt = await res.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) {}
-    if (!res.ok) { const err = new Error((j && (j.error_description || j.msg || j.message || j.error)) || "HTTP " + res.status); err.status = res.status; throw err; }
+    if (!res.ok) {
+      if (res.status === 401 && auth && this.sess && !this._retried) { // token ditolak: paksa perbarui sesi sekali lalu ulangi
+        this._retried = true; this.sess.expires_at = 0;
+        try { return await this.req(path, { method, body, auth, prefer }); } finally { this._retried = false; }
+      }
+      const err = new Error((j && (j.error_description || j.msg || j.message || j.error)) || "HTTP " + res.status); err.status = res.status; throw err;
+    }
     return j;
   },
   async refreshIfNeeded() {
@@ -3857,6 +3863,11 @@ const Cloud = {
     return rows && rows[0] ? { data: rows[0].data, rt: new Date(rows[0].updated_at).getTime() } : null;
   },
   async afterLogin(interactive) {
+    try { await this.syncNow(interactive); }
+    catch (e) { this.fail(e); toast("Sinkronisasi data gagal", (e && e.message) || "Coba lagi nanti.", "warn"); }
+    finally { await this.ensureToken().catch(() => {}); this.render(); Live.start(); }
+  },
+  async syncNow(interactive) {
     const stamp = await this.remoteStamp();
     const remote = stamp ? { updated_at: stamp } : null, rt = stamp;
     this.base = Math.max(rt, this.base || 0);
@@ -3867,8 +3878,6 @@ const Cloud = {
       else await this.push();
     } else if (!remote || (S.updatedAt || 0) > rt + 1000) await this.push();
     this.status = "ok"; this.lastSync = Date.now(); this.chip();
-    await this.ensureToken().catch(e => console.warn(e));
-    this.render(); Live.start();
   },
   schedule() { if (!this.sess || !this.cfg()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.push().catch(e => this.fail(e)), 4000); },
   async push() {
@@ -3888,22 +3897,30 @@ const Cloud = {
     this.base = S.updatedAt || Date.now();
     this.status = "ok"; this.lastSync = Date.now(); this.chip(); this.render();
   },
-  fail(e) { this.status = "error"; this.chip(); console.warn("Sinkronisasi:", e.message); },
+  fail(e) { this.status = "error"; this.lastErr = (e && e.message) || ""; this.chip(); console.warn("Sinkronisasi:", this.lastErr); },
+  tokenErr: "", tokenBusy: false,
   async ensureToken() {
-    const id = this.sess.user.id;
-    const rows = await this.req(`/rest/v1/riskdesk_mt5?select=token&user_id=eq.${id}`);
-    if (rows && rows[0]) this.token = rows[0].token;
-    else { const t = randHex(20); await this.req("/rest/v1/riskdesk_mt5", { method: "POST", prefer: "return=minimal", body: { user_id: id, token: t } }); this.token = t; }
+    if (!this.sess || this.tokenBusy) return;
+    this.tokenBusy = true; this.tokenErr = "";
+    try {
+      const id = this.sess.user.id;
+      const rows = await this.req(`/rest/v1/riskdesk_mt5?select=token&user_id=eq.${id}`);
+      if (rows && rows[0] && rows[0].token) this.token = rows[0].token;
+      else { const t = randHex(20); await this.req("/rest/v1/riskdesk_mt5", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: { user_id: id, token: t } }); this.token = t; }
+    } catch (e) { this.tokenErr = (e && e.message) || "gagal"; throw e; }
+    finally { this.tokenBusy = false; this.render(); }
   },
   async newToken() {
     const t = randHex(20);
-    await this.req(`/rest/v1/riskdesk_mt5?user_id=eq.${this.sess.user.id}`, { method: "PATCH", prefer: "return=minimal", body: { token: t } });
-    this.token = t; this.render();
+    // upsert: membuat baris bila belum ada, atau mengganti token bila sudah ada
+    await this.req("/rest/v1/riskdesk_mt5", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: { user_id: this.sess.user.id, token: t } });
+    this.token = t; this.tokenErr = ""; this.render();
   },
   chip() {
     const c = $("syncChip"), map = { local: ["", "Lokal"], syncing: ["warn", "Menyinkronkan"], ok: ["ok", "Tersinkron"], error: ["err", "Gagal sinkron"] };
     const [cls, txt] = this.sess ? map[this.status] : map.local;
     c.className = "chip " + cls; c.innerHTML = `<i></i>${txt}`;
+    if (this.status === "error" && this.lastErr) c.dataset.tip = "Gagal sinkron: " + this.lastErr + ". Klik untuk membuka Cloud & MT5.";
     $("navCloud").textContent = this.sess ? " dan cloud" : "";
   },
   render() {
@@ -3912,7 +3929,8 @@ const Cloud = {
     if (inn) {
       $("cUserEmail").textContent = this.sess.user.email;
       $("cLastSync").textContent = this.lastSync ? `Sinkron terakhir ${relTime(this.lastSync)}.` : "";
-      $("cToken").textContent = this.token || "Memuat…";
+      $("cToken").innerHTML = this.token ? esc(this.token) : this.tokenErr ? `<span class="c-sell">Gagal memuat: ${esc(this.tokenErr)}</span>` : "Memuat…";
+      if (!this.token && !this.tokenErr && !this.tokenBusy) setTimeout(() => this.ensureToken().catch(() => {}), 0);
       const c = this.cfg();
       $("cEaUrl").textContent = c ? c.url : "—";
       $("cEaKey").textContent = c ? c.key : "—";
@@ -3980,7 +3998,8 @@ document.addEventListener("click", async e => {
 });
 $("cNewToken").onclick = async () => {
   if (!(await confirmBox("Buat token baru?", "EA yang memakai token lama akan berhenti mengirim data sampai token baru dipasang.", "Buat baru", false))) return;
-  try { await Cloud.newToken(); toast("Token baru dibuat", "Perbarui input SyncToken di EA.", "ok"); } catch (e) { toast("Gagal", e.message, "danger"); }
+  try { await Cloud.newToken(); toast("Token baru dibuat", "Perbarui input SyncToken di EA.", "ok"); }
+  catch (e) { const m = (e && e.message) || ""; toast("Gagal membuat token", /jwt|expired|401/i.test(m) ? "Sesi login kedaluwarsa. Klik Keluar dari akun, lalu Masuk lagi." : /fetch|network/i.test(m) ? "Tidak bisa menghubungi Supabase. Cek internet, atau buka supabase.com: project mungkin dijeda (klik Restore)." : m, "danger"); }
 };
 $("aLiveMeter").onchange = () => { S.settings.liveInMeter = $("aLiveMeter").checked; save(); onDataChange(); };
 $("aPendMeter").onchange = () => { S.settings.pendInMeter = $("aPendMeter").checked; save(); onDataChange(); };
